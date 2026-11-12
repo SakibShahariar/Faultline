@@ -1,0 +1,11 @@
+[Unit]
+Description=Schedule periodic Faultline diagnostic collection
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=6h
+Persistent=true
+Unit=faultline-collector.service
+
+[Install]
+WantedBy=timers.target
