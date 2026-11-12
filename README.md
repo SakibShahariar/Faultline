@@ -1,44 +1,90 @@
 # Faultline
 
-**Linux crash diagnosis and system forensics**
+**Local-first Linux crash diagnosis and system forensics**
 
-Faultline is a planned native GTK4/libadwaita application for understanding Linux crashes, unexpected shutdowns, and desktop failures. It will correlate system logs, coredumps, boot records, and optional resource history to present evidence-based explanations.
+Faultline is a native GTK4/libadwaita application backed by an unprivileged diagnostic
+collector. It aims to explain Linux crashes, unexpected shutdowns, and desktop failures
+by correlating boot history, system journals, coredumps, kernel events, and optional
+resource history. Findings retain their supporting evidence and uncertainty.
+
+## Current implementation
+
+The repository now contains an initial diagnostic core:
+
+- systemd boot discovery through `journalctl --list-boots`;
+- journal JSON parsing with timestamps, source metadata, and priorities;
+- normalized event signatures and duplicate-event suppression;
+- conservative rules for OOM, kernel panic/oops, GPU resets, storage errors, and
+  GNOME Shell/Mutter failures;
+- boot-ending assessment that does not mistake an abruptly ending journal for proof
+  of a crash;
+- versioned, local SQLite storage;
+- a CLI for scanning and listing collected boots;
+- unit tests and a GitHub Actions test workflow.
+
+The native UI in `demo/native/` remains a design prototype with fictional sample
+records. It is not yet connected to the diagnostic database. Coredump collection,
+pstore, resource sampling, notifications, report export, and distribution packaging
+are not implemented yet.
+
+## Fedora development setup
+
+Install the system dependencies:
+
+```sh
+sudo dnf install python3 python3-pip systemd
+```
+
+From the repository root, install Faultline in editable mode and run a scan:
+
+```sh
+python3 -m pip install --user -e .
+faultline scan
+faultline boots
+```
+
+You can also run the CLI without installing its entry point:
+
+```sh
+python3 -m faultline.cli scan
+```
+
+Run the test suite:
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 -m compileall -q faultline tests
+```
+
+The database is created at
+`~/.local/share/faultline/crashes.db` (or under `$XDG_DATA_HOME` when set).
 
 ## Native UI prototype
 
-The primary design reference is the [native GTK4/libadwaita prototype](demo/native/main.py). It uses real libadwaita widgets rather than CSS imitations.
-
-On Fedora, install the dependencies and launch it:
+The primary design reference is the [native GTK4/libadwaita prototype](demo/native/main.py).
+To run it on Fedora:
 
 ```sh
 sudo dnf install gtk4 libadwaita python3-gobject
 python3 demo/native/main.py
 ```
 
-See [native demo setup](demo/native/README.md) for details.
+See [native demo setup](demo/native/README.md). A
+[browser-based prototype](demo/index.html) is also available for quick preview, but
+it is secondary to the native interface.
 
-The native prototype includes Overview, Incidents, Incident Details, System Health, Extensions, Reports, and Preferences. It uses a GNOME-style header bar and split navigation, grouped preference pages, action rows, switch rows, native alert dialogs, and toast notifications.
+## Privacy and permissions
 
-A [browser-based interactive prototype](demo/index.html) is also available for quick preview. It is secondary to the native demo and only approximates libadwaita visually.
+The collector runs as the current user. It does not invoke `sudo`, install a privileged
+helper, or upload diagnostic data. Journal access varies by distribution and user
+permissions; inaccessible sources are reported rather than silently escalated.
+Reports, when implemented, will be local and user-initiated.
 
-All incidents, system metrics, extension activity, and timestamps shown in both prototypes are fictional sample data. Neither prototype inspects or modifies the host system.
+An abrupt journal ending is not enough to conclude that a system crashed. Power loss,
+hard freezes, journal retention, and permission gaps can all leave incomplete records.
+Likewise, OOM activity alone does not prove that memory pressure caused a reboot.
 
-## Product direction
+## Architecture
 
-The prototypes are an interaction and layout roadmap for the actual application. The intended implementation is:
-
-- GTK4 and libadwaita for the desktop interface.
-- A small background collector, separate from the GUI.
-- Local SQLite storage under `~/.local/share/faultline/`.
-- Existing system sources such as previous-boot journals, `coredumpctl`, kernel messages, pstore when available, and GNOME Shell logs.
-- Optional lightweight resource sampling with configurable retention.
-- Rule-based diagnosis that presents supporting evidence and confidence instead of claiming an unverified root cause.
-- Local-first reports with preview and explicit redaction before sharing.
-
-### Important constraints
-
-Some diagnostic sources are not readable by an ordinary user on every distribution. Faultline should explain missing access and continue with available sources rather than silently requesting broad privileges. Sudden power loss and hard freezes may prevent the final events or samples from being written.
-
-## Development status
-
-The repository currently contains UI prototypes and a product roadmap. The production collector, database, and real diagnostic engine are not implemented yet.
+See [docs/architecture.md](docs/architecture.md) for module boundaries, data flow,
+permission design, and diagnostic interpretation rules.
