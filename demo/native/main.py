@@ -490,6 +490,14 @@ class FaultlineWindow(Adw.ApplicationWindow):
         group = self.group(page, "Storage and retention",
                            "Older boot records are pruned after a successful scan. Unknown timestamps are retained.")
         self.action_row(group, "Local database", str(__import__("pathlib").Path.home() / ".local/share/faultline/crashes.db"))
+        clear_button = Gtk.Button(label="Clear")
+        clear_button.add_css_class("destructive-action")
+        clear_button.connect("clicked", lambda *_: self.clear_history_dialog())
+        self.action_row(
+            group, "Clear diagnostic history",
+            "Delete collected boots, events, findings, source status, and resource samples.",
+            clear_button,
+        )
         for title, key, minimum, maximum in [
             ("History retention (days)", "retention_days", 1, 3650),
             ("Maximum boots per scan", "max_boots_per_scan", 1, 100),
@@ -550,6 +558,44 @@ class FaultlineWindow(Adw.ApplicationWindow):
             return
         self.toast("Background resource sampling enabled." if enabled else
                    "Background resource sampling disabled.")
+
+    def clear_history_dialog(self):
+        dialog = Adw.AlertDialog(
+            heading="Clear diagnostic history?",
+            body=(
+                "This permanently deletes stored boot records, journal events, findings, "
+                "source status, and resource samples from this device. Preferences remain. "
+                "An enabled background sampler will continue recording new samples."
+            ),
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("clear", "Clear History")
+        dialog.set_response_appearance("clear", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.choose(self, None, self.clear_history_finished)
+
+    def clear_history_finished(self, dialog, result):
+        try:
+            response = dialog.choose_finish(result)
+        except Exception:
+            return
+        if response != "clear":
+            return
+        from faultline.storage import Database
+
+        db = Database()
+        try:
+            db.clear_history()
+        finally:
+            db.close()
+        global INCIDENTS, BOOT_SUMMARY, SOURCE_STATUS
+        INCIDENTS = load_incidents()
+        BOOT_SUMMARY = load_boot_summary()
+        SOURCE_STATUS = load_source_status()
+        for page in list(self.pages.values()):
+            self.stack.remove(page)
+        self.pages = {}
+        self._build_pages()
+        self.toast("Local diagnostic history cleared.")
 
     def on_setting_switch(self, row, _property, key):
         from faultline.settings import update_setting
