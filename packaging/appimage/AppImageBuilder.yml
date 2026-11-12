@@ -36,8 +36,8 @@ AppDir:
     name: Faultline
     icon: io.github.sakibshahariar.Faultline
     version: "{{APP_VERSION}}"
-    exec: usr/bin/faultline-app
-    exec_args: $@
+    exec: usr/bin/python3
+    exec_args: ${APPDIR}/usr/share/faultline/launch.py $@
   apt:
     arch: [amd64]
     sources:
