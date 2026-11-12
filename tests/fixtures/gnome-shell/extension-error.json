@@ -1,0 +1,7 @@
+{
+  "MESSAGE": "JS ERROR: TypeError: Cannot read property at /home/test/.local/share/gnome-shell/extensions/demo@example.test/extension.js:42",
+  "__REALTIME_TIMESTAMP": "1794475800000000",
+  "SYSLOG_IDENTIFIER": "gnome-shell",
+  "PRIORITY": "3",
+  "_BOOT_ID": "cccccccccccccccccccccccccccccccc"
+}
