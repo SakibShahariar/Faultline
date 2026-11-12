@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from shutil import copyfile
 from unittest.mock import patch
 
 from faultline.pstore import read_pstore
@@ -10,7 +11,7 @@ class PstoreTests(unittest.TestCase):
     def test_reads_bounded_text_and_marks_heuristic_association(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / "dmesg-ramoops-0").write_text("Kernel panic - not syncing: test")
+            copyfile(Path(__file__).parent / "fixtures" / "pstore" / "dmesg-ramoops-0", root / "dmesg-ramoops-0")
             with patch("faultline.pstore.PSTORE_PATHS", (root,)):
                 events = read_pstore("a" * 32)
             self.assertEqual(len(events), 1)
