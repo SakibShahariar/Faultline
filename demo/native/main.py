@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Faultline native GTK4/libadwaita application."""
+import argparse
 import json
 import sys
 import threading
@@ -134,6 +135,7 @@ def load_source_status():
 INCIDENTS = load_incidents()
 BOOT_SUMMARY = load_boot_summary()
 SOURCE_STATUS = load_source_status()
+OPEN_INCIDENT_ID = None
 
 
 class FaultlineWindow(Adw.ApplicationWindow):
@@ -844,8 +846,20 @@ class FaultlineApplication(Adw.Application):
         if not window:
             window = FaultlineWindow(application=self)
         window.present()
+        if OPEN_INCIDENT_ID:
+            incident = next(
+                (item for item in INCIDENTS if item["id"] == OPEN_INCIDENT_ID), None
+            )
+            if incident:
+                window.show_incident(incident)
+            else:
+                window.show_page("incidents")
 
 
 if __name__ == "__main__":
+    argument_parser = argparse.ArgumentParser(prog="faultline-gui")
+    argument_parser.add_argument("--incident-id")
+    arguments, _unknown = argument_parser.parse_known_args()
+    OPEN_INCIDENT_ID = arguments.incident_id
     app = FaultlineApplication()
-    raise SystemExit(app.run(None))
+    raise SystemExit(app.run([sys.argv[0]]))
