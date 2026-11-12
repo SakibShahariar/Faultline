@@ -636,7 +636,7 @@ class FaultlineWindow(Adw.ApplicationWindow):
 class FaultlineApplication(Adw.Application):
     def __init__(self):
         super().__init__(
-            application_id="io.github.sakibshahariar.FaultlineDemo",
+            application_id="io.github.sakibshahariar.Faultline",
             flags=Gio.ApplicationFlags.DEFAULT_FLAGS,
         )
 
