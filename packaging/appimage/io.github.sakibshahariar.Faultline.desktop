@@ -2,7 +2,7 @@
 Type=Application
 Name=Faultline
 Comment=Diagnose Linux crashes and inspect system failure evidence
-Exec=faultline-app
+Exec=AppRun
 Icon=io.github.sakibshahariar.Faultline
 Terminal=false
 Categories=System;Utility;GTK;
