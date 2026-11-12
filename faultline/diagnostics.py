@@ -47,7 +47,7 @@ def classify(events: list[Event]) -> list[Finding]:
     findings: list[Finding] = []
     for category, title, _pattern, summary in RULES:
         records = grouped.get(category, {})
-        evidence = list(dict.fromkeys(records.values()))
+        evidence = list(records.values())
         if records:
             confidence = "high" if len(records) >= 2 else "moderate"
             findings.append(Finding(category, title, summary, confidence, evidence[:20]))
