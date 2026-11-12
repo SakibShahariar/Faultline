@@ -28,7 +28,7 @@ jobs:
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             version="${GITHUB_REF_NAME#v}"
           else
-            version="$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+            version="$(sed -n 's/^version = "\(.*\)"$/\1/p' pyproject.toml | head -n1)"
           fi
           echo "APP_VERSION=$version" >> "$GITHUB_ENV"
 
