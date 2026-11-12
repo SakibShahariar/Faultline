@@ -21,11 +21,13 @@ spectool -g -R packaging/rpm/faultline.spec
 rpmbuild -ba packaging/rpm/faultline.spec
 ```
 
-The resulting RPM is written to `~/rpmbuild/RPMS/noarch/`.
+The spec downloads the GitHub archive for the `v0.1.0` tag. The resulting RPM
+is written to `~/rpmbuild/RPMS/noarch/`.
 
-For a local working tree, create a source archive matching the spec's expected
-layout (top-level `Faultline-0.1.0/`) and place it in `~/rpmbuild/SOURCES/`
-as `faultline-0.1.0.tar.gz`, or build from a release tag named `v0.1.0`.
+To build the current working tree before creating a release, create a tarball
+whose top-level directory is `Faultline-0.1.0/` and copy it to
+`~/rpmbuild/SOURCES/Faultline-0.1.0.tar.gz`. Then run
+`rpmbuild -ba packaging/rpm/faultline.spec` from the checkout.
 
 ## Install and enable optional collection
 
