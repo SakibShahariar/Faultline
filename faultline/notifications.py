@@ -13,6 +13,7 @@ SEVERITY = {
     "oom": "medium",
     "gpu-reset": "medium",
     "shell-crash": "medium",
+    "shell-restart": "medium",
     "application-crash": "medium",
     "coredump-crash": "medium",
     "extension-error": "low",
