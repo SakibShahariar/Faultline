@@ -58,7 +58,11 @@ class DiagnosisTests(unittest.TestCase):
                       "Process /usr/bin/example produced a coredump (signal 11)",
                       event_type="coredump")
         findings = classify([event])
-        self.assertEqual(findings[0].category, "application-crash")
+        self.assertEqual(findings[0].category, "coredump-crash")
+
+    def test_detects_generic_application_segfault(self):
+        event = Event("c" * 32, "now", "app", "app segfault at address")
+        self.assertEqual(classify([event])[0].category, "application-crash")
 
 
 class StorageTests(unittest.TestCase):
