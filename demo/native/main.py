@@ -72,7 +72,44 @@ def load_incidents():
 
 
 INCIDENTS = load_incidents()
+BOOT_SUMMARY = load_boot_summary()
+SOURCE_STATUS = load_source_status()
 
+
+
+def load_boot_summary():
+    from faultline.storage import Database
+
+    db = Database()
+    try:
+        rows = db.connection.execute("""
+            SELECT boot_id, first_seen, last_seen, boot_index, is_current, shutdown_status
+            FROM boots ORDER BY boot_index DESC
+        """).fetchall()
+        current = next((row for row in rows if row["is_current"]), None)
+        previous = next((row for row in rows if not row["is_current"]), None)
+        return {
+            "count": len(rows),
+            "current_started": current["first_seen"] if current else None,
+            "previous_status": previous["shutdown_status"] if previous else None,
+        }
+    finally:
+        db.close()
+
+
+def load_source_status():
+    from faultline.storage import Database
+
+    db = Database()
+    try:
+        return {
+            row["source"]: {"available": bool(row["available"]), "detail": row["detail"]}
+            for row in db.connection.execute(
+                "SELECT source, available, detail FROM source_status"
+            ).fetchall()
+        }
+    finally:
+        db.close()
 
 
 class FaultlineWindow(Adw.ApplicationWindow):
@@ -149,7 +186,7 @@ class FaultlineWindow(Adw.ApplicationWindow):
         sidebar_content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         sidebar_content.append(nav_list)
         sidebar_content.append(Gtk.Box(vexpand=True))
-        collector = Gtk.Label(label="●  Collector not connected", xalign=0)
+        collector = Gtk.Label(label="●  On-demand collection · no background service", xalign=0)
         collector.add_css_class("dim-label")
         collector.add_css_class("caption")
         collector.set_margin_start(14)
@@ -221,10 +258,11 @@ class FaultlineWindow(Adw.ApplicationWindow):
                                           "warning" if INCIDENTS else "dim-label"))
         self.action_row(group, "Incident history", "Findings stored in the local database.",
                         Gtk.Label(label=str(len(INCIDENTS))))
-        self.action_row(group, "Boot history", "Available after the first journal scan.",
-                        Gtk.Label(label="—"))
-        self.action_row(group, "Shutdown assessment", "Unknown until boot records have been collected.",
-                        Gtk.Label(label="—"))
+        self.action_row(group, "Boot history", "Boot records collected from systemd journal.",
+                        Gtk.Label(label=str(BOOT_SUMMARY["count"])))
+        previous_status = BOOT_SUMMARY["previous_status"] or "not assessed"
+        self.action_row(group, "Previous boot ending", "Evidence-based shutdown assessment.",
+                        Gtk.Label(label=previous_status.replace("_", " ").title()))
 
         group = self.group(page, "Recent incidents")
         if not INCIDENTS:
@@ -278,14 +316,18 @@ class FaultlineWindow(Adw.ApplicationWindow):
         ]:
             self.action_row(group, title, subtitle, Gtk.Label(label=value))
         group = self.group(page, "Diagnostic sources", "Availability depends on system permissions and configuration.")
-        for title, state, style in [
-            ("Previous boot journal", "Availability shown after scan", "dim-label"),
-            ("Application coredumps", "Availability shown after scan", "dim-label"),
-            ("Kernel messages", "Via journal access", "dim-label"),
-            ("pstore", "Not implemented", "dim-label"),
-            ("Resource sampler", "Not implemented", "dim-label"),
+        for title, source, fallback in [
+            ("Boot journals", "journal", "Not checked"),
+            ("Application coredumps", "coredumpctl", "Not checked"),
+            ("Kernel messages", "journal", "Collected through journal"),
+            ("pstore", "pstore", "Not implemented"),
+            ("Resource sampler", "sampler", "Not implemented"),
         ]:
-            self.action_row(group, title, suffix=self.status_label(state, style))
+            status = SOURCE_STATUS.get(source)
+            state = ("Available" if status["available"] else "Unavailable") if status else fallback
+            style = "success" if status and status["available"] else "warning" if status else "dim-label"
+            subtitle = status["detail"] if status else None
+            self.action_row(group, title, subtitle, self.status_label(state, style))
 
         page = self.add_page("extensions", "Extensions")
         group = self.group(page, "GNOME Shell extensions",
@@ -301,17 +343,19 @@ class FaultlineWindow(Adw.ApplicationWindow):
                         self.status_label("Review before sharing", "warning"))
 
         page = self.add_page("preferences", "Preferences")
-        group = self.group(page, "Collection", "Choose which diagnostic sources Faultline should inspect.")
-        for title, subtitle, enabled in [
-            ("Inspect logs on startup", "Look for new boot and crash records.", True),
-            ("Background resource monitoring", "Collect lightweight CPU, memory, and thermal samples.", False),
-            ("Monitor GNOME Shell logs", "Correlate desktop restarts with session events.", True),
-        ]:
-            row = Adw.SwitchRow()
-            row.set_title(title)
-            row.set_subtitle(subtitle)
-            row.set_active(enabled)
-            group.add(row)
+        group = self.group(page, "Collection", "Collection currently runs only when you press Scan. Automatic startup scans and background monitoring are planned.")
+        row = Adw.ActionRow()
+        row.set_title("Automatic startup scan")
+        row.set_subtitle("Not implemented yet")
+        group.add(row)
+        row = Adw.ActionRow()
+        row.set_title("Background resource monitoring")
+        row.set_subtitle("Not implemented yet")
+        group.add(row)
+        row = Adw.ActionRow()
+        row.set_title("GNOME extension correlation")
+        row.set_subtitle("Not implemented yet")
+        group.add(row)
 
         group = self.group(page, "Privacy", "Diagnostic data stays on this device unless you export it.")
         for title, subtitle, enabled in [
@@ -441,6 +485,8 @@ class FaultlineWindow(Adw.ApplicationWindow):
             self.toast("Scan failed: " + error)
             return GLib.SOURCE_REMOVE
         INCIDENTS = load_incidents()
+        BOOT_SUMMARY = load_boot_summary()
+        SOURCE_STATUS = load_source_status()
         for page in list(self.pages.values()):
             self.stack.remove(page)
         self.pages = {}
