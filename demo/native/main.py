@@ -53,10 +53,25 @@ def load_incidents():
                 ).fetchone()["evidence_json"]
             ))
             events = db.connection.execute("""
-                SELECT timestamp, source, message, event_type, metadata_json FROM events
+                SELECT timestamp, source, message, signature, event_type, metadata_json FROM events
                 WHERE boot_id = ? ORDER BY timestamp LIMIT 200
             """, (row["boot_id"],)).fetchall()
-            events = [event for event in events if event["message"] in evidence_messages]
+            grouped_events = {}
+            for event in events:
+                if event["message"] not in evidence_messages:
+                    continue
+                key = (event["timestamp"], event["signature"])
+                if key not in grouped_events:
+                    grouped_events[key] = {
+                        **dict(event),
+                        "sources": {event["source"]},
+                    }
+                else:
+                    grouped_events[key]["sources"].add(event["source"])
+                    if event["source"] == "systemd-coredump":
+                        grouped_events[key]["metadata_json"] = event["metadata_json"]
+                        grouped_events[key]["source"] = event["source"]
+            events = list(grouped_events.values())
             severity = {
                 "kernel-panic": "High",
                 "storage-error": "High",
