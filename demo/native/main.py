@@ -331,8 +331,23 @@ class FaultlineWindow(Adw.ApplicationWindow):
         page = self.add_page("extensions", "Extensions")
         group = self.group(page, "GNOME Shell extensions",
                            "Extension activity can be correlated with incidents, but timing alone is not proof.")
-        self.action_row(group, "Extension correlation not available",
-                        "GNOME Shell and extension log correlation is planned; no extension is identified as a suspect yet.")
+        extension_incidents = [
+            incident for incident in INCIDENTS
+            if incident["category"] == "extension-error"
+        ]
+        if extension_incidents:
+            for incident in extension_incidents:
+                self.action_row(
+                    group, incident["title"], incident["detail"],
+                    self.status_label("Correlated", "warning"),
+                    "application-x-addon-symbolic",
+                    lambda *_args, item=incident: self.show_incident(item),
+                )
+        else:
+            self.action_row(
+                group, "No explicit extension error match",
+                "Faultline only lists an extension when an error record explicitly references an enabled extension. No causal claim is made."
+            )
 
         page = self.add_page("reports", "Reports")
         group = self.group(page, "Export diagnostics", "Reports are generated locally and should be reviewed before sharing.")
