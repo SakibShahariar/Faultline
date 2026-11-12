@@ -41,10 +41,17 @@ python3 -m unittest discover -s tests -v
 python3 -m compileall -q faultline tests demo/native
 
 %files -f %{pyproject_files}
+%{_bindir}/faultline
+%{_bindir}/faultline-gui
 %{_datadir}/faultline/demo/native/main.py
+%exclude %{_datadir}/faultline/demo/native/__pycache__/*
 %{_datadir}/applications/io.github.sakibshahariar.Faultline.desktop
 %{_datadir}/metainfo/io.github.sakibshahariar.Faultline.metainfo.xml
 %{_datadir}/icons/hicolor/scalable/apps/io.github.sakibshahariar.Faultline.svg
 %{_userunitdir}/faultline-collector.service
 %{_userunitdir}/faultline-collector.timer
 %{_userunitdir}/faultline-sampler.service
+
+%changelog
+* Thu Nov 12 2026 Sakib Shahariar <74959773+SakibShahariar@users.noreply.github.com> - 0.1.0-1
+- Add Fedora RPM packaging for Faultline
