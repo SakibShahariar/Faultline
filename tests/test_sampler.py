@@ -1,8 +1,9 @@
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
-from faultline.sampler import collect_sample
+from faultline.sampler import collect_sample, run_sampler
 from faultline.storage import Database
 
 
@@ -74,6 +75,13 @@ class SamplerTests(unittest.TestCase):
             self.assertEqual(db.prune_samples(24), 1)
             self.assertEqual(len(db.latest_samples(10)), 1)
             db.close()
+
+    def test_disabled_sampler_exits_before_opening_database(self):
+        with patch("faultline.sampler.load_settings", return_value={"background_sampler": False}), \
+             patch("faultline.sampler.Database") as database:
+            with self.assertRaisesRegex(RuntimeError, "sampling is disabled"):
+                run_sampler()
+        database.assert_not_called()
 
     def test_unsupported_metrics_are_not_reported_as_zero(self):
         with tempfile.TemporaryDirectory() as directory:
