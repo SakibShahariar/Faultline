@@ -1,0 +1,42 @@
+"""Conservative rule-based incident classification."""
+from __future__ import annotations
+
+import re
+from collections import defaultdict
+
+from .models import Event, Finding
+
+RULES = [
+    ("oom", "Out-of-memory activity", re.compile(
+        r"out of memory|oom-kill|oom killer|killed process \d+", re.I),
+     "The kernel recorded memory-pressure or OOM-killer activity."),
+    ("kernel-panic", "Kernel panic or oops", re.compile(
+        r"kernel panic|general protection fault|kernel oops|BUG: unable to handle", re.I),
+     "The kernel logged a panic, oops, or fatal kernel fault."),
+    ("gpu-reset", "GPU reset or hang", re.compile(
+        r"gpu.*(hang|reset|timeout)|ring .* timeout|failed to.*(gpu|fence)|"
+        r"amdgpu.*timeout|i915.*(hang|reset)|nouveau.*timeout", re.I),
+     "Graphics-driver messages indicate a possible GPU hang or reset."),
+    ("storage-error", "Storage or I/O errors", re.compile(
+        r"I/O error|blk_update_request|buffer I/O error|nvme.*(timeout|reset|error)", re.I),
+     "The kernel or storage stack reported an I/O or device error."),
+    ("shell-crash", "GNOME Shell failure", re.compile(
+        r"gnome-shell.*(segfault|core dumped)|gnome-shell.*terminated|"
+        r"mutter.*(crash|segfault)", re.I),
+     "The session journal contains a GNOME Shell or Mutter failure indicator."),
+]
+
+
+def classify(events: list[Event]) -> list[Finding]:
+    grouped: dict[str, list[str]] = defaultdict(list)
+    for event in events:
+        for category, _title, pattern, _summary in RULES:
+            if pattern.search(event.message):
+                grouped[category].append(event.message[:500])
+    findings: list[Finding] = []
+    for category, title, _pattern, summary in RULES:
+        evidence = grouped.get(category, [])
+        if evidence:
+            confidence = "high" if len(evidence) >= 2 else "moderate"
+            findings.append(Finding(category, title, summary, confidence, evidence[:20]))
+    return findings
