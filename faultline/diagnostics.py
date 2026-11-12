@@ -24,6 +24,9 @@ RULES = [
         r"gnome-shell.*(segfault|core dumped)|gnome-shell.*terminated|"
         r"mutter.*(crash|segfault)", re.I),
      "The session journal contains a GNOME Shell or Mutter failure indicator."),
+    ("application-crash", "Application crash", re.compile(
+        r"produced a coredump|segfault|core dumped|terminated by signal", re.I),
+     "A userspace process crash or coredump was recorded."),
 ]
 
 
