@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Faultline native GTK4/libadwaita application."""
+import json
 import sys
 import threading
 from pathlib import Path
@@ -30,13 +31,23 @@ def load_incidents():
         """).fetchall()
         incidents = []
         for row in rows:
+            evidence_messages = set(json.loads(
+                db.connection.execute(
+                    "SELECT evidence_json FROM findings WHERE id = ?", (row["id"],)
+                ).fetchone()["evidence_json"]
+            ))
             events = db.connection.execute("""
                 SELECT timestamp, source, message FROM events
                 WHERE boot_id = ? ORDER BY timestamp LIMIT 200
             """, (row["boot_id"],)).fetchall()
-            severity = "High" if row["category"] in ("kernel-panic", "storage-error") else (
-                "Medium" if row["confidence"] == "high" else "Low"
-            )
+            events = [event for event in events if event["message"] in evidence_messages]
+            severity = {
+                "kernel-panic": "High",
+                "storage-error": "High",
+                "oom": "Medium",
+                "gpu-reset": "Medium",
+                "shell-crash": "Medium",
+            }.get(row["category"], "Low")
             boot_label = "Current boot" if row["is_current"] else "Previous boot"
             when = row["last_seen"] or row["first_seen"] or "Time unavailable"
             incidents.append({
@@ -268,8 +279,8 @@ class FaultlineWindow(Adw.ApplicationWindow):
             self.action_row(group, title, subtitle, Gtk.Label(label=value))
         group = self.group(page, "Diagnostic sources", "Availability depends on system permissions and configuration.")
         for title, state, style in [
-            ("Previous boot journal", "Checked during scan", "dim-label"),
-            ("Application coredumps", "Checked during scan", "dim-label"),
+            ("Previous boot journal", "Availability shown after scan", "dim-label"),
+            ("Application coredumps", "Availability shown after scan", "dim-label"),
             ("Kernel messages", "Via journal access", "dim-label"),
             ("pstore", "Not implemented", "dim-label"),
             ("Resource sampler", "Not implemented", "dim-label"),
