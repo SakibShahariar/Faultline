@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from faultline.collector import scan
+from faultline.collector import _merge_findings, scan
 from faultline.models import Boot, Event
 from faultline.presentation import load_boot_summary, load_incidents, load_source_status
 from faultline.sources import SourceError
@@ -48,6 +48,20 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(stored["id"], first_finding_id)
         self.assertEqual(self.db.connection.execute("SELECT COUNT(*) FROM events").fetchone()[0], 1)
         self.assertEqual(self.db.connection.execute("SELECT COUNT(*) FROM findings").fetchone()[0], 1)
+
+    def test_counter_evidence_from_a_later_batch_lowers_existing_finding(self):
+        target = {}
+        _merge_findings(target, [
+            Event(self.boot.boot_id, "2026-11-12T09:30:00+00:00",
+                  "kernel", "Out of memory: Killed process 123")
+        ])
+        _merge_findings(target, [
+            Event(self.boot.boot_id, "2026-11-12T09:31:00+00:00",
+                  "faultline-audit", "No OOM killer activity was recorded in this boot")
+        ])
+        finding = target["oom"]
+        self.assertEqual(finding.confidence, "low")
+        self.assertEqual(len(finding.contradicting_evidence), 1)
 
     def test_collected_incident_flows_through_database_to_ui_view_model(self):
         event = Event(
