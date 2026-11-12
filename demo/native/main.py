@@ -417,7 +417,7 @@ class FaultlineWindow(Adw.ApplicationWindow):
             ("Boot journals", "journal", "Not checked"),
             ("Application coredumps", "coredumpctl", "Not checked"),
             ("Kernel messages", "journal", "Collected through journal"),
-            ("pstore", "pstore", "Not implemented"),
+            ("pstore", "pstore", "Not checked"),
             ("GNOME extension inventory", "gnome-extensions", "Not available on this desktop"),
             ("Resource sampler", "sampler", "Not enabled"),
         ]:
