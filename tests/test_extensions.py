@@ -1,12 +1,23 @@
+import json
 import unittest
+from pathlib import Path
 
 from faultline.extensions import correlate_extension_events
 from faultline.models import Event
+from faultline.sources import parse_journal_json
 
 
 class ExtensionCorrelationTests(unittest.TestCase):
     def event(self, message, source="gnome-shell"):
         return Event("a" * 32, "2026-11-12T09:30:00+00:00", source, message)
+
+    def test_parses_sanitized_gnome_journal_fixture(self):
+        fixture = Path(__file__).parent / "fixtures" / "gnome-shell" / "extension-error.json"
+        row = json.loads(fixture.read_text(encoding="utf-8"))
+        events = parse_journal_json([json.dumps(row)], row["_BOOT_ID"])
+        self.assertEqual(len(events), 1)
+        self.assertIn("JS ERROR", events[0].message)
+        self.assertEqual(events[0].source, "gnome-shell")
 
     def test_matches_only_enabled_extension_error_paths(self):
         extension = "blur-my-shell@aunetx"
