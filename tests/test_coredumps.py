@@ -12,7 +12,7 @@ class CoredumpParserTests(unittest.TestCase):
             "COREDUMP_SIGNAL": "11",
             "COREDUMP_PID": "1234",
             "COREDUMP_TIMESTAMP": "2026-11-12T09:30:00+00:00",
-            "COREDUMP_CMDLINE": "example --token=secret --config=/home/alice/app.conf",
+            "COREDUMP_CMDLINE": "example --token=secret --password secret2 --config=/home/alice/app.conf",
         }
         events = parse_coredump_json(json.dumps([record]))
         self.assertEqual(len(events), 1)
@@ -20,6 +20,8 @@ class CoredumpParserTests(unittest.TestCase):
         self.assertEqual(events[0].metadata["executable"], "/usr/bin/example")
         self.assertNotIn("secret", str(events[0].metadata["command"]))
         self.assertIn("--token=<redacted>", events[0].metadata["command"])
+        self.assertIn("--password <redacted>", events[0].metadata["command"])
+        self.assertNotIn("secret2", events[0].metadata["command"])
         self.assertIn("/home/alice/app.conf", events[0].metadata["command"])
         self.assertEqual(events[0].metadata["uid"], None)
 
