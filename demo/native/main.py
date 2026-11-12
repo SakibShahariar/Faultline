@@ -183,7 +183,9 @@ class FaultlineWindow(Adw.ApplicationWindow):
         split.set_min_sidebar_width(210)
         split.set_max_sidebar_width(260)
         split.set_sidebar_width_fraction(0.22)
-        self.set_content(split)
+        self.toast_overlay = Adw.ToastOverlay()
+        self.toast_overlay.set_child(split)
+        self.set_content(self.toast_overlay)
 
         nav_list.select_row(self.nav_rows["overview"])
 
@@ -410,10 +412,10 @@ class FaultlineWindow(Adw.ApplicationWindow):
         self.action_row(group, "Compare repeated incidents",
                         "Look for the same signature in earlier boots.")
 
-        back = Gtk.Button(label="Back to incidents")
-        back.add_css_class("flat")
-        back.connect("clicked", lambda *_: self.show_page("incidents"))
-        page.set_header_suffix(back)
+        group = self.group(page, "Navigation")
+        self.action_row(group, "Back to incidents", "Return to the incident list.",
+                        icon="go-previous-symbolic",
+                        callback=lambda *_: self.show_page("incidents"))
         self.stack.set_visible_child_name("incident-detail")
 
     def scan_dialog(self, *_args):
@@ -455,12 +457,7 @@ class FaultlineWindow(Adw.ApplicationWindow):
             self.toast("Report export is not connected in this prototype.")
 
     def toast(self, message):
-        toast = Adw.Toast.new(message)
-        # Toast overlay is provided by the application window in the real app;
-        # keep this prototype feedback non-blocking via a simple alert.
-        dialog = Adw.AlertDialog(heading="Faultline", body=message)
-        dialog.add_response("ok", "OK")
-        dialog.present(self)
+        self.toast_overlay.add_toast(Adw.Toast.new(message))
 
 
 class FaultlineApplication(Adw.Application):
