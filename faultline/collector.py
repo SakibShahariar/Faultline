@@ -172,10 +172,10 @@ def scan(database: Database | None = None) -> dict:
             if journal_ok:
                 replace_categories = {
                     "oom", "kernel-panic", "gpu-reset", "storage-error",
-                    "shell-crash",
+                    "shell-crash", "application-crash",
                 }
                 if coredump_ok:
-                    replace_categories.add("application-crash")
+                    replace_categories.add("coredump-crash")
                 if pstore_ok:
                     replace_categories.add("pstore-crash")
                 if extensions_ok:
