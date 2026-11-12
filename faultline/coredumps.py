@@ -12,7 +12,7 @@ from .sources import SourceError, _run
 
 _BOOT_ID = re.compile(r"^[0-9a-fA-F]{32}$")
 _SECRET_ARGUMENT = re.compile(
-    r"(?i)(--?(?:token|password|passwd|secret|api[-_]key)=)([^\\s]+)"
+    r"(?i)(--?(?:token|password|passwd|secret|api[-_]key)=)([^\s]+)"
 )
 
 
@@ -29,7 +29,7 @@ def _safe_command(value: Any) -> str | None:
     if value in (None, ""):
         return None
     command = _text(value)[:2000]
-    return _SECRET_ARGUMENT.sub(r"\\1<redacted>", command)
+    return _SECRET_ARGUMENT.sub(r"\1<redacted>", command)
 
 
 def _first(record: dict[str, Any], *names: str) -> Any:
