@@ -194,6 +194,10 @@ def scan(database: Database | None = None, notify: bool = False) -> dict:
                 )
                 summary["new_findings"].extend(newly_created)
                 summary["findings"] += len(findings)
+        db.set_source_status(
+            "journal", True,
+            f"Collection completed for {len(boots)} boot record(s)"
+        )
         summary["boots_pruned"] = db.prune_old_boots(settings["retention_days"])
         if notify and settings["notify_new_incidents"] and summary["new_findings"]:
             from .notifications import dispatch_notifications
