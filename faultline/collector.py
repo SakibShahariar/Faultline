@@ -140,11 +140,20 @@ def scan(database: Database | None = None) -> dict:
                 summary["events_added"] += db.add_events(pstore_events)
                 _merge_findings(findings_by_category, pstore_events)
 
-            boot.shutdown_status = assess_shutdown(shutdown_evidence, current=boot.current)
+            if journal_ok:
+                boot.shutdown_status = assess_shutdown(shutdown_evidence, current=boot.current)
+            else:
+                stored = db.connection.execute(
+                    "SELECT shutdown_status FROM boots WHERE boot_id = ?",
+                    (boot.boot_id,),
+                ).fetchone()
+                if stored:
+                    boot.shutdown_status = stored["shutdown_status"]
             db.upsert_boot(boot)
             findings = list(findings_by_category.values()) + list(extension_findings.values())
-            db.add_findings(boot.boot_id, findings)
-            summary["findings"] += len(findings)
+            if journal_ok:
+                db.add_findings(boot.boot_id, findings)
+                summary["findings"] += len(findings)
         return summary
     finally:
         if own_database:
