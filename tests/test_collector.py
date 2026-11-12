@@ -65,6 +65,16 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(load_boot_summary(self.db)["count"], 1)
         self.assertIn("journal", load_source_status(self.db))
 
+    def test_source_status_view_marks_old_checks_as_stale(self):
+        self.db.set_source_status("journal", True, "journal is readable")
+        self.db.connection.execute(
+            "UPDATE source_status SET checked_at = ? WHERE source = ?",
+            ("2000-01-01 00:00:00", "journal"),
+        )
+        status = load_source_status(self.db)
+        self.assertTrue(status["journal"]["available"])
+        self.assertTrue(status["journal"]["stale"])
+
     def test_journal_failure_preserves_existing_findings(self):
         event = Event(self.boot.boot_id, "2026-01-01T00:00:00+00:00",
                       "kernel", "Out of memory: Killed process 123")
