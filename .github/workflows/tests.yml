@@ -57,3 +57,22 @@ jobs:
           systemd-analyze verify data/systemd/user/faultline-collector.service data/systemd/user/faultline-collector.timer data/systemd/user/faultline-sampler.service
       - name: Launch native application under a virtual display
         run: GTK_A11Y=none dbus-run-session -- xvfb-run -a /usr/bin/python3 tests/native_smoke.py
+
+  rpm-build:
+    runs-on: ubuntu-latest
+    container: fedora:44
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Fedora RPM build dependencies
+        run: |
+          dnf install -y rpm-build redhat-rpm-config pyproject-rpm-macros \
+            python3-devel python3-pip python3-setuptools python3-gobject \
+            gtk4 libadwaita systemd-rpm-macros tar gzip
+      - name: Create source archive from the checked-out commit
+        run: |
+          mkdir -p "$HOME/rpmbuild/SOURCES"
+          tar --exclude=.git \
+            --transform='s,^\./,Faultline-0.1.0/,' \
+            -czf "$HOME/rpmbuild/SOURCES/v0.1.0.tar.gz" .
+      - name: Build Fedora RPM
+        run: rpmbuild -ba packaging/rpm/faultline.spec --define "_topdir $HOME/rpmbuild"
