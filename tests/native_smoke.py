@@ -32,5 +32,22 @@ window.show_incident({
     "evidence_truncated": False,
 })
 assert window.stack.get_visible_child_name() == "incident-detail"
+window.show_recurrence({
+    "signature": "fixture-signature",
+    "sources": "kernel",
+    "source": "kernel",
+    "first_seen": "2026-11-10T09:00:00+00:00",
+    "last_seen": "2026-11-11T09:00:00+00:00",
+    "boot_count": 2,
+    "event_count": 2,
+    "occurrences_truncated": False,
+    "occurrences": [{
+        "boot_id": "a" * 32,
+        "timestamp": "2026-11-10T09:00:00+00:00",
+        "source": "kernel",
+        "message": "Out of memory: Killed process 123",
+    }],
+})
+assert window.stack.get_visible_child_name() == "recurrence-detail"
 window.close()
 app.quit()
