@@ -2,7 +2,7 @@ Name:           faultline
 Version:        0.1.0
 Release:        1%{?dist}
 Summary:        Local-first Linux crash diagnosis and system forensics
-License:        NOASSERTION
+License:        MIT
 URL:            https://github.com/SakibShahariar/Faultline
 Source0:        %{url}/archive/refs/tags/v%{version}.tar.gz
 
