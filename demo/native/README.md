@@ -30,8 +30,9 @@ and scan-limit settings are persisted under `~/.config/faultline/settings.json`.
 
 The optional systemd user timer and resource sampler service are documented in the
 repository README. The sampler can be enabled from Preferences after installing its
-user unit; interval and retention are configurable. Next-login notifications are
-not implemented yet; the UI describes their status instead of showing fabricated values.
+user unit; interval and retention are configurable. The scheduled collector can send deduplicated desktop notifications with an action
+that opens the relevant incident. Notification enablement and minimum severity are
+configurable in Preferences.
 
 The database is stored at `~/.local/share/faultline/crashes.db` by default. It may be
 moved under `$XDG_DATA_HOME` when that environment variable is set.
