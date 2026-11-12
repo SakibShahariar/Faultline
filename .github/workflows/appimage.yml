@@ -1,0 +1,113 @@
+name: AppImage
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  appimage:
+    name: Build and smoke-test AppImage
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install AppImage build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            curl libfuse2 squashfs-tools fakeroot desktop-file-utils appstream docker.io
+
+      - name: Resolve application version
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          fi
+          echo "APP_VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Download pinned AppImage builder
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: |
+          curl --fail --location --retry 3 \
+            https://github.com/AppImageCrafters/appimage-builder/releases/download/v1.1.0/appimage-builder-1.1.0-x86_64.AppImage \
+            --output "$RUNNER_TEMP/appimage-builder"
+          curl --fail --location --retry 3 \
+            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage \
+            --output "$RUNNER_TEMP/appimagetool"
+          chmod +x "$RUNNER_TEMP/appimage-builder" "$RUNNER_TEMP/appimagetool"
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      - name: Build AppImage
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: |
+          appimage-builder --recipe packaging/appimage/AppImageBuilder.yml --skip-test
+          appimage="Faultline-$APP_VERSION-x86_64.AppImage"
+          test -s "$appimage"
+          chmod +x "$appimage"
+          sha256sum "$appimage" | tee "$appimage.sha256"
+
+      - name: Validate desktop integration metadata
+        run: |
+          desktop-file-validate packaging/appimage/io.github.sakibshahariar.Faultline.desktop
+          appstreamcli validate data/metainfo/io.github.sakibshahariar.Faultline.metainfo.xml
+
+      - name: Build clean offline smoke-test image
+        run: |
+          docker build --tag faultline-appimage-smoke - <<'DOCKERFILE'
+          FROM ubuntu:22.04
+          ENV DEBIAN_FRONTEND=noninteractive
+          RUN apt-get update && apt-get install -y --no-install-recommends \
+              ca-certificates coreutils dbus-x11 xvfb xauth \
+              && rm -rf /var/lib/apt/lists/*
+          DOCKERFILE
+
+      - name: Test AppImage without host Python or GTK
+        run: |
+          appimage="$PWD/Faultline-$APP_VERSION-x86_64.AppImage"
+          state="$RUNNER_TEMP/faultline-appimage-state"
+          mkdir -p "$state"
+          docker run --rm --network none \
+            --volume "$appimage:/tmp/Faultline.AppImage:ro" \
+            --volume "$state:/tmp/state" \
+            faultline-appimage-smoke bash -euc '
+              export APPIMAGE_EXTRACT_AND_RUN=1
+              export XDG_DATA_HOME=/tmp/state/data
+              export XDG_CONFIG_HOME=/tmp/state/config
+              /tmp/Faultline.AppImage --cli boots
+              test -s /tmp/state/data/faultline/crashes.db
+              set +e
+              timeout 12s dbus-run-session -- xvfb-run -a \
+                env GTK_A11Y=none GDK_BACKEND=x11 /tmp/Faultline.AppImage
+              result=$?
+              set -e
+              if [ "$result" -ne 124 ]; then
+                echo "GUI smoke test exited unexpectedly: $result"
+                exit 1
+              fi
+            '
+
+      - name: Upload AppImage and checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: Faultline-${{ env.APP_VERSION }}-x86_64-AppImage
+          path: |
+            Faultline-${{ env.APP_VERSION }}-x86_64.AppImage
+            Faultline-${{ env.APP_VERSION }}-x86_64.AppImage.sha256
+          if-no-files-found: error
+
+      - name: Attach AppImage to tagged GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            Faultline-${{ env.APP_VERSION }}-x86_64.AppImage
+            Faultline-${{ env.APP_VERSION }}-x86_64.AppImage.sha256
