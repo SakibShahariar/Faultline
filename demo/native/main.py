@@ -689,6 +689,19 @@ class FaultlineWindow(Adw.ApplicationWindow):
         self.action_row(group, "Boot ID", incident.get("boot_id", "Unavailable"))
 
         group = self.group(
+            page, "Counter-evidence",
+            "Explicit records that conflict with a detected rule. Absence of a match does not prove the diagnosis."
+        )
+        if incident.get("contradicting_evidence"):
+            for message in incident["contradicting_evidence"]:
+                self.action_row(group, "Conflicting record", message)
+        else:
+            self.action_row(
+                group, "No explicit counter-evidence recorded",
+                "None of the collected records matched a direct counter-pattern for this finding."
+            )
+
+        group = self.group(
             page, "Evidence timeline",
             "Expand a record to inspect its original message. Related records from overlapping sources are grouped."
         )
