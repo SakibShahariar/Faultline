@@ -1,8 +1,10 @@
 """Conservative GNOME Shell extension error correlation."""
 from __future__ import annotations
 
+import json
 import re
 from datetime import datetime
+from pathlib import Path
 
 from .models import Event, Finding
 from .sources import SourceError, _run
@@ -26,6 +28,38 @@ def list_enabled_extensions() -> set[str]:
     result = _run(["gnome-extensions", "list", "--enabled"], timeout=15)
     return {line.strip() for line in result.stdout.splitlines() if line.strip()}
 
+
+
+def extension_metadata_roots() -> tuple[Path, ...]:
+    return (
+        Path.home() / ".local" / "share" / "gnome-shell" / "extensions",
+        Path("/usr/local/share/gnome-shell/extensions"),
+        Path("/usr/share/gnome-shell/extensions"),
+    )
+
+
+def describe_enabled_extensions(enabled_extensions: set[str]) -> list[dict]:
+    """Read local metadata for enabled extensions without invoking their code."""
+    descriptions = []
+    roots = extension_metadata_roots()
+    for extension_id in sorted(enabled_extensions):
+        metadata = {}
+        for root in roots:
+            path = root / extension_id / "metadata.json"
+            try:
+                candidate = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if isinstance(candidate, dict):
+                metadata = candidate
+                break
+        descriptions.append({
+            "uuid": extension_id,
+            "name": str(metadata.get("name") or extension_id),
+            "version": metadata.get("version"),
+            "state": "enabled",
+        })
+    return descriptions
 
 def is_extension_error_candidate(event: Event) -> bool:
     source = event.source.lower()
