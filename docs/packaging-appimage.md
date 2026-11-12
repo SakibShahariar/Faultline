@@ -5,8 +5,8 @@ remains the preferred native package on Fedora.
 
 ## Build
 
-The AppImage is built from Ubuntu 22.04 packages so its bundled Python 3.10,
-PyGObject, GTK 4, and libadwaita runtime has a conservative glibc baseline.
+The AppImage is built from Ubuntu 24.04 packages so its bundled Python 3.12,
+PyGObject, GTK 4, and libadwaita 1.5 runtime supports the APIs used by the native UI.
 The build uses the pinned appimage-builder 1.1.0 release and the AppImage tool.
 
 Install the host build tools on Ubuntu 24.04:

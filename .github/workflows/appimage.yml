@@ -142,6 +142,6 @@ jobs:
             Faultline ${{ env.APP_VERSION }} x86_64 AppImage.
 
             The image bundles Python, PyGObject, GTK 4, and libadwaita. It targets
-            Linux x86_64 with glibc 2.35 or newer. Host systemd diagnostic tools,
+            Linux x86_64 with glibc 2.39 or newer. Host systemd diagnostic tools,
             GNOME session utilities, graphics drivers, and display server remain
             host-provided. See docs/packaging-appimage.md for runtime details.
