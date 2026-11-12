@@ -133,6 +133,14 @@ class FaultlineWindow(Adw.ApplicationWindow):
             vexpand=True,
         )
         self.pages = {}
+        self.nav_names = [
+            ("overview", "Overview", "view-dashboard-symbolic"),
+            ("incidents", "Incidents", "dialog-warning-symbolic"),
+            ("health", "System health", "utilities-system-monitor-symbolic"),
+            ("extensions", "Extensions", "application-x-addon-symbolic"),
+            ("reports", "Reports", "document-properties-symbolic"),
+            ("preferences", "Preferences", "preferences-system-symbolic"),
+        ]
         self._build_pages()
 
         header = Adw.HeaderBar()
@@ -163,14 +171,6 @@ class FaultlineWindow(Adw.ApplicationWindow):
         nav_list.add_css_class("navigation-sidebar")
         nav_list.connect("row-selected", self.on_navigation_selected)
 
-        self.nav_names = [
-            ("overview", "Overview", "view-dashboard-symbolic"),
-            ("incidents", "Incidents", "dialog-warning-symbolic"),
-            ("health", "System health", "utilities-system-monitor-symbolic"),
-            ("extensions", "Extensions", "application-x-addon-symbolic"),
-            ("reports", "Reports", "document-properties-symbolic"),
-            ("preferences", "Preferences", "preferences-system-symbolic"),
-        ]
         self.nav_rows = {}
         for name, title, icon in self.nav_names:
             row = Gtk.ListBoxRow()
@@ -192,7 +192,7 @@ class FaultlineWindow(Adw.ApplicationWindow):
         sidebar_content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         sidebar_content.append(nav_list)
         sidebar_content.append(Gtk.Box(vexpand=True))
-        collector = Gtk.Label(label="●  On-demand collection · no background service", xalign=0)
+        collector = Gtk.Label(label="●  Optional systemd user collector", xalign=0)
         collector.add_css_class("dim-label")
         collector.add_css_class("caption")
         collector.set_margin_start(14)
