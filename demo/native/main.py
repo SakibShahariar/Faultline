@@ -759,7 +759,10 @@ class FaultlineWindow(Adw.ApplicationWindow):
         except Exception as exc:
             self.toast("Report export failed: " + str(exc))
             return
-        self.toast("Redacted report saved.")
+        self.toast(
+            "Redacted report saved." if settings["redact_reports"] else
+            "Unredacted report saved. Review it carefully before sharing."
+        )
 
     def toast(self, message):
         self.toast_overlay.add_toast(Adw.Toast.new(message))
