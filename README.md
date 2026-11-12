@@ -76,6 +76,7 @@ Install and enable the units:
 mkdir -p ~/.config/systemd/user
 cp data/systemd/user/faultline-collector.service ~/.config/systemd/user/
 cp data/systemd/user/faultline-collector.timer ~/.config/systemd/user/
+cp data/systemd/user/faultline-sampler.service ~/.config/systemd/user/
 systemctl --user daemon-reload
 systemctl --user enable --now faultline-collector.timer
 ```
