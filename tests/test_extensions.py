@@ -1,8 +1,10 @@
 import json
+import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from faultline.extensions import correlate_extension_events
+from faultline.extensions import correlate_extension_events, describe_enabled_extensions
 from faultline.models import Event
 from faultline.sources import parse_journal_json
 
@@ -10,6 +12,23 @@ from faultline.sources import parse_journal_json
 class ExtensionCorrelationTests(unittest.TestCase):
     def event(self, message, source="gnome-shell"):
         return Event("a" * 32, "2026-11-12T09:30:00+00:00", source, message)
+
+    def test_extension_inventory_reads_name_and_version_from_metadata(self):
+        extension = "blur-my-shell@aunetx"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            metadata_dir = root / extension
+            metadata_dir.mkdir()
+            (metadata_dir / "metadata.json").write_text(json.dumps({
+                "uuid": extension,
+                "name": "Blur my Shell",
+                "version": 67,
+            }))
+            with patch("faultline.extensions.extension_metadata_roots", return_value=(root,)):
+                inventory = describe_enabled_extensions({extension})
+        self.assertEqual(inventory[0]["name"], "Blur my Shell")
+        self.assertEqual(inventory[0]["version"], 67)
+        self.assertEqual(inventory[0]["state"], "enabled")
 
     def test_parses_sanitized_gnome_journal_fixture(self):
         fixture = Path(__file__).parent / "fixtures" / "gnome-shell" / "extension-error.json"
