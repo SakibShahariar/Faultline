@@ -8,6 +8,14 @@ from faultline.storage import Database
 
 
 class StorageMigrationTests(unittest.TestCase):
+    def test_database_and_parent_directory_are_user_only(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "private" / "faultline.db"
+            db = Database(path)
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(path.parent.stat().st_mode & 0o777, 0o700)
+            db.close()
+
     def test_migrates_existing_version_one_database(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "faultline.db"
