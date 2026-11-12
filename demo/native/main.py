@@ -326,7 +326,7 @@ class FaultlineWindow(Adw.ApplicationWindow):
             for item in recurring_events[:5]:
                 self.action_row(
                     group,
-                    item["source"] + " · " + str(item["boot_count"]) + " boots",
+                    (item["sources"] or item["source"]) + " · " + str(item["boot_count"]) + " boots",
                     item["example"],
                     Gtk.Label(label=str(item["event_count"]) + " events"),
                 )
