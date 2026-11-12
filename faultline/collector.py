@@ -25,11 +25,11 @@ def _merge_findings(target: dict[str, Finding], batch: list[Event]) -> None:
         existing.confidence = "high"
 
 
-def scan(database: Database | None = None) -> dict:
+def scan(database: Database | None = None, notify: bool = False) -> dict:
     own_database = database is None
     db = database or Database()
     summary = {"boots_seen": 0, "events_added": 0, "coredumps_seen": 0,
-               "findings": 0, "source_errors": []}
+               "findings": 0, "new_findings": [], "source_errors": []}
     try:
         settings = load_settings()
         try:
@@ -188,12 +188,18 @@ def scan(database: Database | None = None) -> dict:
                     replace_categories.add("pstore-crash")
                 if extensions_ok:
                     replace_categories.add("extension-error")
-                db.add_findings(
+                newly_created = db.add_findings(
                     boot.boot_id, findings,
                     replace_categories=replace_categories,
                 )
+                summary["new_findings"].extend(newly_created)
                 summary["findings"] += len(findings)
         summary["boots_pruned"] = db.prune_old_boots(settings["retention_days"])
+        if notify and settings["notify_new_incidents"] and summary["new_findings"]:
+            from .notifications import dispatch_notifications
+            summary["notifications_started"] = dispatch_notifications(
+                summary["new_findings"], settings
+            )
         return summary
     finally:
         if own_database:
