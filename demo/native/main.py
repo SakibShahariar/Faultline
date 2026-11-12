@@ -28,9 +28,10 @@ startup_trace("PyGObject imported")
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 startup_trace("GTK and libadwaita versions selected")
-from gi.repository import Adw, Gio, GLib, Gtk
-
-startup_trace("GTK and libadwaita imported")
+from gi.repository import Gtk
+startup_trace("GTK imported")
+from gi.repository import Adw, Gio, GLib
+startup_trace("libadwaita imported")
 
 
 def evidence_detail(event):
