@@ -22,8 +22,11 @@ assert window is not None, "Faultline did not create its main window"
 assert window.get_title() == "Faultline"
 overview = window.pages["overview"]
 assert isinstance(overview, module.Gtk.ScrolledWindow), "Overview is not using the dashboard layout"
-assert isinstance(overview.get_child(), module.Adw.Clamp), "Overview is not width-clamped"
-assert overview.get_child().get_maximum_size() == 1320, "Overview width limit changed unexpectedly"
+clamp = overview.get_child()
+while clamp is not None and not isinstance(clamp, module.Adw.Clamp):
+    clamp = clamp.get_child() if hasattr(clamp, "get_child") else None
+assert isinstance(clamp, module.Adw.Clamp), "Overview is not width-clamped"
+assert clamp.get_maximum_size() == 1320, "Overview width limit changed unexpectedly"
 icon_theme = module.Gtk.IconTheme.get_for_display(window.get_display())
 for _name, _label, icon_name in window.nav_names:
     assert icon_theme.has_icon(icon_name), f"Missing bundled navigation icon: {icon_name}"
