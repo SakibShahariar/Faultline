@@ -39,6 +39,34 @@ class ExtensionCorrelationTests(unittest.TestCase):
         self.assertIn("does not prove", findings[0].summary)
         self.assertEqual(events[0].metadata["correlated_shell_failures"], 1)
 
+    def test_repeated_extension_errors_group_nearby_shell_failures(self):
+        extension = "blur-my-shell@aunetx"
+        first = self.event(
+            "JS ERROR: TypeError at /extensions/blur-my-shell@aunetx/extension.js"
+        )
+        second = self.event(
+            "JS ERROR: ReferenceError at /extensions/blur-my-shell@aunetx/extension.js"
+        )
+        second.timestamp = "2026-11-12T09:31:00+00:00"
+        first_shell = self.event(
+            "gnome-shell.service: Main process exited, code=dumped, status=11/SEGV",
+            source="systemd",
+        )
+        first_shell.timestamp = "2026-11-12T09:32:00+00:00"
+        second_shell = self.event(
+            "mutter: gnome-shell crashed with signal 11",
+            source="mutter",
+        )
+        second_shell.timestamp = "2026-11-12T09:33:00+00:00"
+
+        correlated, findings = correlate_extension_events(
+            [first, second], {extension}, [first_shell, second_shell]
+        )
+        self.assertEqual(len(correlated), 2)
+        self.assertEqual(len(findings), 1)
+        self.assertEqual(findings[0].confidence, "moderate")
+        self.assertEqual(len(findings[0].evidence), 4)
+
     def test_extension_error_without_nearby_shell_failure_is_not_a_suspect(self):
         message = "JS ERROR: TypeError at /extensions/blur-my-shell@aunetx/extension.js"
         _events, findings = correlate_extension_events(
