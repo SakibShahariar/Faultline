@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Iterable
 
@@ -131,6 +132,30 @@ class Database:
                   available=excluded.available, detail=excluded.detail,
                   checked_at=CURRENT_TIMESTAMP
             """, (source, int(available), detail))
+
+    def prune_old_boots(self, retention_days: int) -> int:
+        """Delete records for boots older than the configured retention window."""
+        cutoff = datetime.now() - timedelta(days=max(1, min(int(retention_days), 3650)))
+        candidates = self.connection.execute(
+            "SELECT boot_id, last_seen FROM boots WHERE is_current = 0"
+        ).fetchall()
+        expired = []
+        for row in candidates:
+            value = row["last_seen"]
+            if not value:
+                continue
+            try:
+                last_seen = datetime.strptime(value, "%a %Y-%m-%d %H:%M:%S")
+            except ValueError:
+                continue
+            if last_seen < cutoff:
+                expired.append((row["boot_id"],))
+        if expired:
+            with self.connection:
+                self.connection.executemany(
+                    "DELETE FROM boots WHERE boot_id = ?", expired
+                )
+        return len(expired)
 
     def close(self) -> None:
         self.connection.close()
