@@ -62,6 +62,9 @@ class StorageMigrationTests(unittest.TestCase):
                     evidence_json TEXT NOT NULL DEFAULT '[]',
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 );
+                INSERT INTO findings(
+                    boot_id, category, title, summary, confidence, evidence_json
+                ) VALUES('a', 'oom', 'legacy', 'legacy summary', 'moderate', '["old evidence"]');
                 PRAGMA user_version = 3;
             """)
             connection.close()
@@ -72,7 +75,7 @@ class StorageMigrationTests(unittest.TestCase):
                 "SELECT contradicting_evidence_json FROM findings"
             ).fetchone()
             self.assertEqual(version, 4)
-            self.assertIsNone(row)
+            self.assertEqual(json.loads(row["contradicting_evidence_json"]), [])
             db.close()
 
     def test_counter_evidence_persists_on_insert_and_update(self):
