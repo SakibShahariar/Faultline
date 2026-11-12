@@ -66,6 +66,8 @@ def parse_coredump_json(payload: str) -> list[Event]:
         pid = _first(record, "COREDUMP_PID", "pid", "PID")
         uid = _first(record, "COREDUMP_UID", "uid", "UID")
         command = _safe_command(_first(record, "COREDUMP_CMDLINE", "cmdline", "CMDLINE"))
+        raw_stack = _first(record, "COREDUMP_STACKTRACE", "stacktrace", "STACKTRACE")
+        stack_summary = _text(raw_stack)[:1500] if raw_stack else None
         raw_timestamp = _first(record, "COREDUMP_TIMESTAMP", "timestamp", "TIME")
         timestamp = "unknown"
         if raw_timestamp is not None:
@@ -87,6 +89,8 @@ def parse_coredump_json(payload: str) -> list[Event]:
                 "pid": str(pid) if pid is not None else None,
                 "uid": str(uid) if uid is not None else None,
                 "command": command,
+                "stack_summary": stack_summary,
+                "stacktrace_available": stack_summary is not None,
             },
         ))
     return events
