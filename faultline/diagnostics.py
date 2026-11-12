@@ -24,9 +24,12 @@ RULES = [
         r"gnome-shell.*(segfault|core dumped)|gnome-shell.*terminated|"
         r"mutter.*(crash|segfault)", re.I),
      "The session journal contains a GNOME Shell or Mutter failure indicator."),
+    ("coredump-crash", "Application coredump", re.compile(
+        r"produced a coredump", re.I),
+     "systemd-coredump recorded a userspace process coredump."),
     ("application-crash", "Application crash", re.compile(
-        r"produced a coredump|segfault|core dumped|terminated by signal", re.I),
-     "A userspace process crash or coredump was recorded."),
+        r"segfault|core dumped|terminated by signal", re.I),
+     "The journal contains a userspace process crash indicator."),
     ("pstore-crash", "Retained kernel crash record", re.compile(
         r"kernel panic|oops:|watchdog:|soft lockup|hard lockup|"
         r"BUG: unable to handle|general protection fault", re.I),
