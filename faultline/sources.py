@@ -106,27 +106,42 @@ def read_boot_events(boot_id: str, since: str | None = None) -> list[Event]:
 
 def iter_boot_events(boot_id: str, timeout: int = 90):
     """Yield journal events one JSON record at a time with a bounded idle timeout."""
+    import os
+
     command = ["journalctl", f"--boot={boot_id}", "--output=json", "--no-pager", "--quiet"]
     if not shutil.which(command[0]):
         raise SourceError(f"Required command not found: {command[0]}")
     process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                               text=True, encoding="utf-8", errors="replace", bufsize=1)
+                               bufsize=0)
     assert process.stdout is not None
     selector = selectors.DefaultSelector()
     selector.register(process.stdout, selectors.EVENT_READ)
+    pending = bytearray()
     last_activity = time.monotonic()
     try:
         while True:
-            ready = selector.select(timeout=max(0.1, timeout - (time.monotonic() - last_activity)))
+            remaining = timeout - (time.monotonic() - last_activity)
+            ready = selector.select(timeout=max(0.1, remaining))
             if not ready:
                 process.kill()
                 process.wait()
                 raise SourceError("journalctl timed out while reading boot records")
-            line = process.stdout.readline()
-            if line == "":
+            chunk = os.read(process.stdout.fileno(), 65536)
+            if not chunk:
                 break
             last_activity = time.monotonic()
-            yield from parse_journal_json([line], boot_id)
+            pending.extend(chunk)
+            while True:
+                newline = pending.find(b"\\n")
+                if newline < 0:
+                    break
+                line = pending[:newline].decode("utf-8", errors="replace")
+                del pending[:newline + 1]
+                yield from parse_journal_json([line], boot_id)
+        if pending:
+            yield from parse_journal_json(
+                [pending.decode("utf-8", errors="replace")], boot_id
+            )
         return_code = process.wait(timeout=5)
         if return_code:
             raise SourceError(f"journalctl exited with status {return_code}")
