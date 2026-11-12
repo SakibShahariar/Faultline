@@ -47,6 +47,9 @@ def load_incidents():
                 "oom": "Medium",
                 "gpu-reset": "Medium",
                 "shell-crash": "Medium",
+                "application-crash": "Medium",
+                "coredump-crash": "Medium",
+                "pstore-crash": "High",
             }.get(row["category"], "Low")
             boot_label = "Current boot" if row["is_current"] else "Previous boot"
             when = row["last_seen"] or row["first_seen"] or "Time unavailable"
