@@ -31,7 +31,7 @@ class StorageMigrationTests(unittest.TestCase):
                     "SELECT name FROM sqlite_master WHERE type='table'"
                 )
             }
-            self.assertEqual(version, 2)
+            self.assertEqual(version, 3)
             self.assertIn("samples", tables)
             migrated.close()
 
