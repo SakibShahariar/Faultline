@@ -27,6 +27,10 @@ RULES = [
     ("application-crash", "Application crash", re.compile(
         r"produced a coredump|segfault|core dumped|terminated by signal", re.I),
      "A userspace process crash or coredump was recorded."),
+    ("pstore-crash", "Retained kernel crash record", re.compile(
+        r"kernel panic|oops:|watchdog:|soft lockup|hard lockup|"
+        r"BUG: unable to handle|general protection fault", re.I),
+     "A retained pstore record contains kernel failure indicators."),
 ]
 
 
