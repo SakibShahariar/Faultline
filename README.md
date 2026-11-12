@@ -18,10 +18,13 @@ proof of causation.
 - Explicit extension-error correlation against nearby Shell failures.
 - Event normalization, stable signatures, duplicate suppression, and recurrence
   matching across boots.
+- Supporting and explicit counter-evidence, with confidence reduced when a direct
+  contradiction is present.
 - Local SQLite storage with schema migrations, retention, and clear-history support.
 - GTK4/libadwaita screens for overview, incidents, evidence, system health,
   extensions, reports, and preferences.
-- Optional low-frequency resource sampling and optional actionable desktop
+- Optional low-frequency resource sampling (including available disk I/O error
+  counters) and optional actionable desktop
   notifications for newly detected findings.
 - Local Markdown/JSON report export with personal-data redaction enabled by default.
 - Optional systemd **user** timer; no privileged daemon and no automatic upload.
