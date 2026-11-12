@@ -4,8 +4,15 @@ from __future__ import annotations
 from .storage import Database
 
 
-def find_recurring_events(db: Database, minimum_boots: int = 2) -> list[dict]:
+def find_recurring_events(
+    db: Database,
+    minimum_boots: int = 2,
+    max_groups: int = 25,
+    max_occurrences: int = 100,
+) -> list[dict]:
     minimum_boots = max(2, min(int(minimum_boots), 100))
+    max_groups = max(1, min(int(max_groups), 100))
+    max_occurrences = max(1, min(int(max_occurrences), 500))
     rows = db.connection.execute("""
         SELECT signature,
                COUNT(*) AS event_count,
@@ -21,5 +28,19 @@ def find_recurring_events(db: Database, minimum_boots: int = 2) -> list[dict]:
         GROUP BY signature
         HAVING COUNT(DISTINCT boot_id) >= ?
         ORDER BY boot_count DESC, event_count DESC, last_seen DESC
-    """, (minimum_boots,)).fetchall()
-    return [dict(row) for row in rows]
+        LIMIT ?
+    """, (minimum_boots, max_groups)).fetchall()
+
+    recurring = []
+    for row in rows:
+        item = dict(row)
+        item["occurrences"] = [
+            dict(event) for event in db.connection.execute("""
+                SELECT boot_id, timestamp, source, message
+                FROM events WHERE signature = ?
+                ORDER BY timestamp, boot_id LIMIT ?
+            """, (item["signature"], max_occurrences)).fetchall()
+        ]
+        item["occurrences_truncated"] = item["event_count"] > len(item["occurrences"])
+        recurring.append(item)
+    return recurring
