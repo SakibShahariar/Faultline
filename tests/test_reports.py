@@ -38,14 +38,20 @@ class ReportTests(unittest.TestCase):
             db.add_events([event])
             db.add_findings(boot.boot_id, [
                 Finding("oom", "Out of memory", "See /home/alice/log",
-                        "moderate", ["Killed process"]),
+                        "moderate", ["Killed process"],
+                        ["No OOM killer activity was recorded"]),
             ])
             report = build_report(db)
             self.assertTrue(report["privacy"]["redaction_enabled"])
             self.assertNotIn("alice", json.dumps(report))
+            self.assertEqual(
+                report["boots"][0]["findings"][0]["contradicting_evidence"],
+                ["No OOM killer activity was recorded"],
+            )
             markdown = render_markdown(report)
             self.assertIn("Faultline diagnostic report", markdown)
             self.assertIn("Out of memory", markdown)
+            self.assertIn("Counter-evidence", markdown)
             json_path = write_report(Path(directory) / "report.json", report, "json")
             md_path = write_report(Path(directory) / "report.md", report, "markdown")
             self.assertTrue(json.loads(json_path.read_text())["boots"])
