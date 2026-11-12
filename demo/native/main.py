@@ -370,12 +370,15 @@ class FaultlineWindow(Adw.ApplicationWindow):
             "Most recent sample: " + (latest_sample["captured_at"] if latest_sample else "no samples recorded")
         )
         if latest_sample:
+            sample_metadata = json.loads(latest_sample.get("metadata_json") or "{}")
+            disk_errors = sample_metadata.get("disk_io_errors")
             for title, value, subtitle in [
                 ("Memory", self.format_sample_memory(latest_sample["memory_used_bytes"], latest_sample["memory_total_bytes"]), "Used / total"),
                 ("Swap", self.format_sample_memory(latest_sample["swap_used_bytes"], latest_sample["swap_total_bytes"]), "Used / total"),
                 ("CPU load", self.format_percent(latest_sample["cpu_percent"]), "Last sampling interval"),
                 ("Temperature", self.format_temperature(latest_sample["temperature_c"]), "Highest readable thermal zone"),
                 ("GPU load", self.format_percent(latest_sample["gpu_busy_percent"]), "Supported GPU devices only"),
+                ("Disk I/O errors", str(disk_errors) if disk_errors is not None else "Unavailable", "Available device counters only"),
             ]:
                 self.action_row(group, title, subtitle, Gtk.Label(label=value))
         else:
