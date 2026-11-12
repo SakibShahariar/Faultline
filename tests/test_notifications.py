@@ -15,35 +15,55 @@ class NotificationTests(unittest.TestCase):
              "summary": "High severity"},
         ]
         with (
-            patch("faultline.notifications.shutil.which", return_value="/usr/bin/notify-send"),
-            patch("faultline.notifications.subprocess.Popen") as spawn,
+            patch("faultline.notifications.shutil.which",
+                  side_effect=lambda name: "/usr/bin/" + name if name == "notify-send" else None),
+            patch("faultline.notifications.subprocess.run",
+                  return_value=subprocess.CompletedProcess([], 0, stdout="", stderr="")) as run,
         ):
             count = dispatch_notifications(
-                findings, {"notification_min_severity": "high"}
+                findings, {"notify_new_incidents": True, "notification_min_severity": "high"}
             )
         self.assertEqual(count, 1)
-        command = spawn.call_args.args[0]
-        self.assertIn("FL-0002", command)
-        self.assertEqual(command[1], "-m")
-        self.assertEqual(command[2], "faultline.notifications")
+        command = run.call_args.args[0]
+        self.assertEqual(command[0], "notify-send")
+        self.assertIn("Faultline: Kernel panic", command)
 
-    def test_clicking_notification_launches_matching_incident(self):
+    def test_clicking_notification_launches_matching_incident_in_user_scope(self):
         argv = [
             "faultline-notification", "--incident-id", "FL-0007",
             "--title", "Faultline incident", "--body", "Review evidence",
             "--severity", "high",
         ]
+        which = {
+            "notify-send": "/usr/bin/notify-send",
+            "systemd-run": "/usr/bin/systemd-run",
+            "faultline-gui": "/home/test/.local/bin/faultline-gui",
+        }
+        responses = [
+            subprocess.CompletedProcess([], 0, stdout="default\n", stderr=""),
+            subprocess.CompletedProcess([], 0, stdout="", stderr=""),
+        ]
         with (
             patch.object(sys, "argv", argv),
-            patch("faultline.notifications.shutil.which", return_value="/usr/bin/notify-send"),
-            patch("faultline.notifications.subprocess.run",
-                  return_value=subprocess.CompletedProcess([], 0, stdout="default\n", stderr="")),
-            patch("faultline.notifications.subprocess.Popen") as spawn,
+            patch("faultline.notifications.shutil.which", side_effect=lambda name: which.get(name)),
+            patch("faultline.notifications.subprocess.run", side_effect=responses) as run,
         ):
             self.assertEqual(main(), 0)
-        command = spawn.call_args.args[0]
+        command = run.call_args_list[1].args[0]
+        self.assertEqual(command[0], "systemd-run")
         self.assertIn("--incident-id", command)
         self.assertIn("FL-0007", command)
+
+    def test_notifications_can_be_disabled(self):
+        with patch("faultline.notifications.subprocess.run") as run:
+            self.assertEqual(
+                dispatch_notifications(
+                    [{"id": 1, "category": "oom", "title": "OOM", "summary": "evidence"}],
+                    {"notify_new_incidents": False, "notification_min_severity": "low"},
+                ),
+                0,
+            )
+        run.assert_not_called()
 
 
 if __name__ == "__main__":
