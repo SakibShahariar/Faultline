@@ -52,6 +52,7 @@ def load_incidents(database: Database | None = None) -> list[dict]:
                 "oom": "Medium",
                 "gpu-reset": "Medium",
                 "shell-crash": "Medium",
+                "shell-restart": "Medium",
                 "application-crash": "Medium",
                 "coredump-crash": "Medium",
             }.get(row["category"], "Low")
