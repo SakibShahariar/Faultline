@@ -407,7 +407,10 @@ class FaultlineWindow(Adw.ApplicationWindow):
                      ("Available" if status["available"] else "Unavailable")) if status else fallback
             style = ("dim-label" if disabled else
                      ("success" if status and status["available"] else "warning" if status else "dim-label"))
-            subtitle = status["detail"] if status else None
+            subtitle = (
+                status["detail"] + " · checked " + status["checked_at"]
+                if status else None
+            )
             self.action_row(group, title, subtitle, self.status_label(state, style))
 
         page = self.add_page("extensions", "Extensions")
