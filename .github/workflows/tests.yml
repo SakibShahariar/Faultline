@@ -82,16 +82,21 @@ jobs:
             gtk4 libadwaita systemd-rpm-macros xorg-x11-server-Xvfb dbus-daemon tar gzip
       - name: Resolve and validate package version
         run: |
-          project_version="$(sed -n 's/^version = "\\(.*\\)"$/\\1/p' pyproject.toml | head -n1)"
-          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
-            version="${GITHUB_REF_NAME#v}"
-            if [[ "$version" != "$project_version" ]]; then
-              echo "Tag version $version does not match pyproject.toml version $project_version"
-              exit 1
-            fi
-          else
-            version="$project_version"
-          fi
+          set -eu
+          project_version="$(awk -F'"' '/^version = / { print $2; exit }' pyproject.toml)"
+          case "$GITHUB_REF" in
+            refs/tags/v*)
+              version="${GITHUB_REF_NAME#v}"
+              if [ "$version" != "$project_version" ]; then
+                echo "Tag version $version does not match pyproject.toml version $project_version"
+                exit 1
+              fi
+              ;;
+            *)
+              version="$project_version"
+              ;;
+          esac
+          test -n "$version"
           echo "APP_VERSION=$version" >> "$GITHUB_ENV"
       - name: Create source archive from the checked-out commit
         run: |
