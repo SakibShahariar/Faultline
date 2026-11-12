@@ -15,6 +15,12 @@ class SignatureTests(unittest.TestCase):
         self.assertEqual(normalize_message("Killed process 1234 at 0xdeadbeef"),
                          normalize_message("Killed process 5678 at 0xcafebabe"))
 
+    def test_distinct_failure_messages_keep_distinct_signatures(self):
+        self.assertNotEqual(
+            signature_for("nvme nvme0: I/O error"),
+            signature_for("gnome-shell segfault at 0xdeadbeef"),
+        )
+
     def test_signature_is_stable(self):
         self.assertEqual(signature_for("oom-kill pid=123"), signature_for("oom-kill pid=456"))
 
