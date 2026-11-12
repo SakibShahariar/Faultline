@@ -68,7 +68,7 @@ def load_incidents():
                         event["timestamp"],
                         event["source"],
                         event["message"] + (
-                            "\\nCommand: " + (json.loads(event["metadata_json"]).get("command") or "")
+                            "\nCommand: " + (json.loads(event["metadata_json"]).get("command") or "")
                             if json.loads(event["metadata_json"]).get("command") else ""
                         ),
                     )
@@ -384,8 +384,11 @@ class FaultlineWindow(Adw.ApplicationWindow):
             ("Resource sampler", "sampler", "Not enabled"),
         ]:
             status = SOURCE_STATUS.get(source)
-            state = ("Available" if status["available"] else "Unavailable") if status else fallback
-            style = "success" if status and status["available"] else "warning" if status else "dim-label"
+            disabled = bool(status and status["detail"].startswith("Disabled in Faultline settings"))
+            state = ("Disabled" if disabled else
+                     ("Available" if status["available"] else "Unavailable")) if status else fallback
+            style = ("dim-label" if disabled else
+                     ("success" if status and status["available"] else "warning" if status else "dim-label"))
             subtitle = status["detail"] if status else None
             self.action_row(group, title, subtitle, self.status_label(state, style))
 
@@ -637,7 +640,7 @@ class FaultlineWindow(Adw.ApplicationWindow):
     def scan_dialog(self, *_args):
         dialog = Adw.AlertDialog(
             heading="Scan diagnostic records?",
-            body="Faultline will read the boot journals and coredump metadata available to your user account. It will not request administrator privileges.",
+            body="Faultline will read the boot journals and selected optional sources available to your user account, including coredump metadata and retained pstore records when enabled. It will not request administrator privileges.",
         )
         dialog.add_response("cancel", "Cancel")
         dialog.add_response("scan", "Start Scan")
