@@ -12,13 +12,16 @@ class CoredumpParserTests(unittest.TestCase):
             "COREDUMP_SIGNAL": "11",
             "COREDUMP_PID": "1234",
             "COREDUMP_TIMESTAMP": "2026-11-12T09:30:00+00:00",
-            "COREDUMP_CMDLINE": "example --private-token secret",
+            "COREDUMP_CMDLINE": "example --token=secret --config=/home/alice/app.conf",
         }
         events = parse_coredump_json(json.dumps([record]))
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0].event_type, "coredump")
         self.assertEqual(events[0].metadata["executable"], "/usr/bin/example")
-        self.assertNotIn("private-token", str(events[0].metadata))
+        self.assertNotIn("secret", str(events[0].metadata["command"]))
+        self.assertIn("--token=<redacted>", events[0].metadata["command"])
+        self.assertIn("/home/alice/app.conf", events[0].metadata["command"])
+        self.assertEqual(events[0].metadata["uid"], None)
 
     def test_ignores_records_without_valid_boot_id(self):
         self.assertEqual(parse_coredump_json(json.dumps([{"COREDUMP_EXE": "/bin/app"}])), [])
