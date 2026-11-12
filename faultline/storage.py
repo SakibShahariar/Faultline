@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterable
 
@@ -180,7 +180,7 @@ class Database:
         ).fetchall()
 
     def prune_samples(self, retention_hours: int) -> int:
-        cutoff = (datetime.now().astimezone() - timedelta(
+        cutoff = (datetime.now(timezone.utc) - timedelta(
             hours=max(1, min(int(retention_hours), 720))
         )).isoformat()
         with self.connection:
