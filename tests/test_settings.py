@@ -34,6 +34,8 @@ class SettingsTests(unittest.TestCase):
             self.assertFalse(load_settings()["redact_reports"])
             path = Path(directory) / "faultline" / "settings.json"
             self.assertTrue(json.loads(path.read_text())["redact_reports"] is False)
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(path.parent.stat().st_mode & 0o777, 0o700)
 
     def test_unknown_setting_is_rejected(self):
         with self.assertRaises(KeyError):
