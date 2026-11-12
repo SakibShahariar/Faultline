@@ -35,7 +35,7 @@ APP_VERSION=0.1.1 APPIMAGE_EXTRACT_AND_RUN=1 \
 The output is `Faultline-0.1.1-x86_64.AppImage`. The CI workflow builds this
 artifact on pushes, pull requests, and version tags; it also produces a SHA-256
 checksum and runs the AppImage in a clean Ubuntu container without network
-access, host Python, or host GTK packages.
+access, host Python, or host GTK packages. The GUI smoke test runs against the bundled runtime under X11 and a headless Wayland compositor, verifies the window and navigation widgets, and exercises the collapsed navigation layout.
 
 ## Run
 
@@ -64,8 +64,9 @@ APPIMAGE_EXTRACT_AND_RUN=1 ./Faultline-0.1.1-x86_64.AppImage
 ## Runtime requirements and limitations
 
 - Linux x86_64 with glibc 2.39 or newer. The AppImage is built against Ubuntu
-  22.04; distributions using musl (such as Alpine) are not supported.
+  24.04; distributions using musl (such as Alpine) are not supported.
 - A working X11 or Wayland desktop session and compatible host graphics drivers.
+- The bundled libadwaita 1.5 runtime requires glibc 2.39 or newer.
 - Faultline bundles its Python, PyGObject, GTK 4, libadwaita, and related desktop
   runtime libraries. It does not bundle the host's kernel interfaces, graphics
   drivers, systemd tools, or GNOME session.

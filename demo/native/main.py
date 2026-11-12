@@ -47,8 +47,6 @@ def evidence_detail(event):
 
 
 
-
-
 INCIDENTS = []
 BOOT_SUMMARY = {"count": 0, "current_started": None, "previous_status": None}
 SOURCE_STATUS = {}
