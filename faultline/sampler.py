@@ -34,7 +34,8 @@ def _cpu_counters(path: Path) -> tuple[int, int] | None:
         parts = line.split()
         if not parts or parts[0] != "cpu":
             return None
-        values = [int(value) for value in parts[1:]]
+        # guest and guest_nice are already included in user/nice counters.
+        values = [int(value) for value in parts[1:9]]
         if len(values) < 4:
             return None
         idle = values[3] + (values[4] if len(values) > 4 else 0)
