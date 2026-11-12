@@ -1,0 +1,90 @@
+name: Fedora RPM
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ startsWith(github.ref, 'refs/tags/') && format('faultline-release-{0}', github.ref) || format('{0}-{1}', github.workflow, github.ref) }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  rpm:
+    name: Build and smoke-test Fedora RPM
+    runs-on: ubuntu-24.04
+    container: fedora:45
+    steps:
+      - name: Install build and runtime dependencies
+        run: |
+          dnf install -y \
+            git tar gzip rpm-build rpmdevtools \
+            python3 python3-devel python3-pip python3-setuptools \
+            pyproject-rpm-macros \
+            python3-gobject gtk4 libadwaita systemd \
+            desktop-file-utils appstream
+          dnf clean all
+
+      - uses: actions/checkout@v4
+
+      - name: Resolve package version
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="$(sed -n 's/^version = "\(.*\)"$/\1/p' pyproject.toml | head -n1)"
+          fi
+          echo "APP_VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Prepare RPM source archive
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/rpmbuild"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
+          git archive --format=tar --prefix="Faultline-$APP_VERSION/" HEAD | gzip -n > "$RUNNER_TEMP/rpmbuild/SOURCES/Faultline-$APP_VERSION.tar.gz"
+          cp packaging/rpm/faultline.spec "$RUNNER_TEMP/rpmbuild/SPECS/faultline.spec"
+          sed -i "s/^Version:.*$/Version:        $APP_VERSION/" "$RUNNER_TEMP/rpmbuild/SPECS/faultline.spec"
+
+      - name: Build RPM
+        shell: bash
+        run: |
+          rpmbuild -ba "$RUNNER_TEMP/rpmbuild/SPECS/faultline.spec" \
+            --define "_topdir $RUNNER_TEMP/rpmbuild" \
+            --define "dist .fc45"
+          mkdir -p dist
+          cp "$RUNNER_TEMP/rpmbuild/RPMS/noarch/"*.rpm dist/
+          cp "$RUNNER_TEMP/rpmbuild/SRPMS/"*.src.rpm dist/
+          (cd dist && sha256sum *.rpm > SHA256SUMS)
+
+      - name: Validate installed RPM contents
+        shell: bash
+        run: |
+          rpmfile="$(find dist -maxdepth 1 -name 'faultline-*.noarch.rpm' -print -quit)"
+          test -n "$rpmfile"
+          rpm -qpl "$rpmfile" | tee dist/installed-files.txt
+          grep -q '/faultline/overview.py' dist/installed-files.txt
+          grep -q '/applications/io.github.sakibshahariar.Faultline.desktop' dist/installed-files.txt
+          grep -q '/faultline-gui$' dist/installed-files.txt
+          desktop-file-validate data/applications/io.github.sakibshahariar.Faultline.desktop
+          appstreamcli validate data/metainfo/io.github.sakibshahariar.Faultline.metainfo.xml
+
+      - name: Upload Fedora RPM
+        uses: actions/upload-artifact@v4
+        with:
+          name: Faultline-${{ env.APP_VERSION }}-Fedora-RPM
+          path: dist/
+          if-no-files-found: error
+
+      - name: Attach RPM to tagged GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.rpm
+            dist/SHA256SUMS
+          fail_on_unmatched_files: true
