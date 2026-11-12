@@ -250,7 +250,15 @@ class FaultlineWindow(Adw.ApplicationWindow):
 
     def _build_pages(self):
         from faultline.settings import load_settings
+        from faultline.recurrence import find_recurring_events
+        from faultline.storage import Database
+
         settings = load_settings()
+        db = Database()
+        try:
+            recurring_events = find_recurring_events(db)
+        finally:
+            db.close()
 
         page = self.add_page("overview", "Overview")
         group = self.group(page, "System status", "Based on records collected from this device.")
@@ -277,6 +285,20 @@ class FaultlineWindow(Adw.ApplicationWindow):
                 incident["icon"],
                 lambda _row, item=incident: self.show_incident(item),
             )
+
+        group = self.group(page, "Recurring patterns",
+                           "The same normalized event signature recorded across multiple boots.")
+        if recurring_events:
+            for item in recurring_events[:5]:
+                self.action_row(
+                    group,
+                    item["source"] + " · " + str(item["boot_count"]) + " boots",
+                    item["example"],
+                    Gtk.Label(label=str(item["event_count"]) + " events"),
+                )
+        else:
+            self.action_row(group, "No recurring signatures",
+                            "A pattern appears here after the same normalized event is recorded in at least two boots.")
 
         group = self.group(page, "Resource snapshot", "Resource sampling is not implemented yet.")
         for title, value, subtitle in [
