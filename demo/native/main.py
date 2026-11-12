@@ -74,13 +74,19 @@ class FaultlineWindow(Adw.ApplicationWindow):
         self.data_error = None
         self.recurring_events = []
         self.latest_sample = None
+        # Ship our own symbolic navigation icons so they remain available even
+        # when the host uses a minimal or incomplete icon theme.
+        icon_theme = Gtk.IconTheme.get_for_display(self.get_display())
+        source_icon_path = ROOT / "data" / "icons"
+        if source_icon_path.is_dir():
+            icon_theme.add_search_path(str(source_icon_path))
         self.nav_names = [
-            ("overview", "Overview", "view-dashboard-symbolic"),
-            ("incidents", "Incidents", "dialog-warning-symbolic"),
-            ("health", "System health", "utilities-system-monitor-symbolic"),
-            ("extensions", "Extensions", "application-x-addon-symbolic"),
-            ("reports", "Reports", "document-properties-symbolic"),
-            ("preferences", "Preferences", "preferences-system-symbolic"),
+            ("overview", "Overview", "faultline-overview-symbolic"),
+            ("incidents", "Incidents", "faultline-incidents-symbolic"),
+            ("health", "System health", "faultline-health-symbolic"),
+            ("extensions", "Extensions", "faultline-extensions-symbolic"),
+            ("reports", "Reports", "faultline-reports-symbolic"),
+            ("preferences", "Preferences", "faultline-preferences-symbolic"),
         ]
         self._build_pages()
 

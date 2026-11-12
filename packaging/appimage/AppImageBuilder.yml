@@ -21,6 +21,9 @@ script:
       "$TARGET_APPDIR/usr/share/metainfo/io.github.sakibshahariar.Faultline.metainfo.xml"
     install -D -m 0644 "$SOURCE_ROOT/data/icons/hicolor/scalable/apps/io.github.sakibshahariar.Faultline.svg" \
       "$TARGET_APPDIR/usr/share/icons/hicolor/scalable/apps/io.github.sakibshahariar.Faultline.svg"
+    install -d "$TARGET_APPDIR/usr/share/icons/hicolor/scalable/actions"
+    install -m 0644 "$SOURCE_ROOT"/data/icons/hicolor/scalable/actions/faultline-*-symbolic.svg \
+      "$TARGET_APPDIR/usr/share/icons/hicolor/scalable/actions/"
     install -D -m 0644 "$SOURCE_ROOT/packaging/appimage/io.github.sakibshahariar.Faultline.desktop" \
       "$TARGET_APPDIR/usr/share/applications/io.github.sakibshahariar.Faultline.desktop"
     install -D -m 0644 "$SOURCE_ROOT/packaging/appimage/launch.py" \

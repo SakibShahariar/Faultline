@@ -49,6 +49,7 @@ python3 -m compileall -q faultline tests demo/native
 %{_datadir}/applications/io.github.sakibshahariar.Faultline.desktop
 %{_datadir}/metainfo/io.github.sakibshahariar.Faultline.metainfo.xml
 %{_datadir}/icons/hicolor/scalable/apps/io.github.sakibshahariar.Faultline.svg
+%{_datadir}/icons/hicolor/scalable/actions/faultline-*-symbolic.svg
 %{_userunitdir}/faultline-collector.service
 %{_userunitdir}/faultline-collector.timer
 %{_userunitdir}/faultline-sampler.service

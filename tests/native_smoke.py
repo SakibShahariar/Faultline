@@ -20,6 +20,9 @@ assert module.OPEN_INCIDENT_ID == "FL-0001"
 window = app.props.active_window
 assert window is not None, "Faultline did not create its main window"
 assert window.get_title() == "Faultline"
+icon_theme = module.Gtk.IconTheme.get_for_display(window.get_display())
+for _name, _label, icon_name in window.nav_names:
+    assert icon_theme.has_icon(icon_name), f"Missing bundled navigation icon: {icon_name}"
 assert window.get_visible(), "Faultline main window is not visible"
 requested_width, requested_height = window.get_size_request()
 assert requested_width < 760 and requested_height < 560, (

@@ -21,6 +21,14 @@ packages = ["faultline"]
 "share/applications" = ["data/applications/io.github.sakibshahariar.Faultline.desktop"]
 "share/metainfo" = ["data/metainfo/io.github.sakibshahariar.Faultline.metainfo.xml"]
 "share/icons/hicolor/scalable/apps" = ["data/icons/hicolor/scalable/apps/io.github.sakibshahariar.Faultline.svg"]
+"share/icons/hicolor/scalable/actions" = [
+  "data/icons/hicolor/scalable/actions/faultline-overview-symbolic.svg",
+  "data/icons/hicolor/scalable/actions/faultline-incidents-symbolic.svg",
+  "data/icons/hicolor/scalable/actions/faultline-health-symbolic.svg",
+  "data/icons/hicolor/scalable/actions/faultline-extensions-symbolic.svg",
+  "data/icons/hicolor/scalable/actions/faultline-reports-symbolic.svg",
+  "data/icons/hicolor/scalable/actions/faultline-preferences-symbolic.svg",
+]
 "lib/systemd/user" = [
   "data/systemd/user/faultline-collector.service",
   "data/systemd/user/faultline-collector.timer",
