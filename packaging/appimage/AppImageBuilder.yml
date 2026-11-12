@@ -1,7 +1,7 @@
 version: 1
 
 # AppImageBuilder recipe for Faultline.
-# Build on Ubuntu 22.04 (glibc 2.35) to keep the host ABI baseline conservative.
+# Build on Ubuntu 24.04 (glibc 2.39) to keep the host ABI baseline conservative.
 # Run from the repository root with APP_VERSION set, for example:
 #   APP_VERSION=0.1.0 appimage-builder --recipe packaging/appimage/AppImageBuilder.yml
 
@@ -25,6 +25,8 @@ script:
       "$TARGET_APPDIR/usr/share/applications/io.github.sakibshahariar.Faultline.desktop"
     install -D -m 0644 "$SOURCE_ROOT/packaging/appimage/launch.py" \
       "$TARGET_APPDIR/usr/share/faultline/launch.py"
+    install -D -m 0644 "$SOURCE_ROOT/tests/native_smoke.py" \
+      "$TARGET_APPDIR/usr/share/faultline/tests/native_smoke.py"
     install -d "$TARGET_APPDIR/usr/bin"
     cc -O2 -Wall -Wextra -Werror \
       "$SOURCE_ROOT/packaging/appimage/launcher.c" \
@@ -45,11 +47,11 @@ AppDir:
   apt:
     arch: [amd64]
     sources:
-      - sourceline: "deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy main universe"
+      - sourceline: "deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ noble main universe"
         key_url: "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x871920D1991BC93C"
-      - sourceline: "deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy-updates main universe"
+      - sourceline: "deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ noble-updates main universe"
         key_url: "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x871920D1991BC93C"
-      - sourceline: "deb [arch=amd64] http://security.ubuntu.com/ubuntu/ jammy-security main universe"
+      - sourceline: "deb [arch=amd64] http://security.ubuntu.com/ubuntu/ noble-security main universe"
         key_url: "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x871920D1991BC93C"
     include:
       - python3

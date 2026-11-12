@@ -20,6 +20,13 @@ assert module.OPEN_INCIDENT_ID == "FL-0001"
 window = app.props.active_window
 assert window is not None, "Faultline did not create its main window"
 assert window.get_title() == "Faultline"
+assert window.get_visible(), "Faultline main window is not visible"
+assert window.get_size_request() == (-1, -1), "Window still imposes a minimum size"
+assert isinstance(window.get_content(), module.Adw.ToastOverlay)
+split_view = window.get_content().get_child()
+assert isinstance(split_view, module.Adw.NavigationSplitView)
+assert split_view.get_sidebar() is not None
+assert split_view.get_content() is not None
 window.show_incident({
     "id": "FL-0001",
     "title": "Smoke-test incident",
@@ -54,5 +61,10 @@ window.show_recurrence({
     }],
 })
 assert window.stack.get_visible_child_name() == "recurrence-detail"
+# Exercise the collapsed navigation state used by narrow tiled windows.
+split_view.set_collapsed(True)
+assert split_view.get_collapsed(), "Navigation split view did not collapse"
+split_view.set_collapsed(False)
+assert not split_view.get_collapsed(), "Navigation split view did not expand"
 window.close()
 app.quit()

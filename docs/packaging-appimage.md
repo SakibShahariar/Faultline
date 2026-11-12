@@ -9,7 +9,7 @@ The AppImage is built from Ubuntu 22.04 packages so its bundled Python 3.10,
 PyGObject, GTK 4, and libadwaita runtime has a conservative glibc baseline.
 The build uses the pinned appimage-builder 1.1.0 release and the AppImage tool.
 
-Install the host build tools on Ubuntu 22.04:
+Install the host build tools on Ubuntu 24.04:
 
 ```sh
 sudo apt-get update
@@ -28,11 +28,11 @@ export PATH="$PWD:$PATH"
 Build from the repository root:
 
 ```sh
-APP_VERSION=0.1.0 APPIMAGE_EXTRACT_AND_RUN=1 \
+APP_VERSION=0.1.1 APPIMAGE_EXTRACT_AND_RUN=1 \
   ./appimage-builder --recipe packaging/appimage/AppImageBuilder.yml --skip-test
 ```
 
-The output is `Faultline-0.1.0-x86_64.AppImage`. The CI workflow builds this
+The output is `Faultline-0.1.1-x86_64.AppImage`. The CI workflow builds this
 artifact on pushes, pull requests, and version tags; it also produces a SHA-256
 checksum and runs the AppImage in a clean Ubuntu container without network
 access, host Python, or host GTK packages.
@@ -42,28 +42,28 @@ access, host Python, or host GTK packages.
 Make the file executable and launch it:
 
 ```sh
-chmod +x Faultline-0.1.0-x86_64.AppImage
-./Faultline-0.1.0-x86_64.AppImage
+chmod +x Faultline-0.1.1-x86_64.AppImage
+./Faultline-0.1.1-x86_64.AppImage
 ```
 
 The graphical application opens by default. The CLI is available through the
 same file:
 
 ```sh
-./Faultline-0.1.0-x86_64.AppImage --cli scan
-./Faultline-0.1.0-x86_64.AppImage --cli boots
-./Faultline-0.1.0-x86_64.AppImage --cli report --format markdown --output ~/faultline-report.md
+./Faultline-0.1.1-x86_64.AppImage --cli scan
+./Faultline-0.1.1-x86_64.AppImage --cli boots
+./Faultline-0.1.1-x86_64.AppImage --cli report --format markdown --output ~/faultline-report.md
 ```
 
 If FUSE 2 is unavailable on the host, try the AppImage extraction fallback:
 
 ```sh
-APPIMAGE_EXTRACT_AND_RUN=1 ./Faultline-0.1.0-x86_64.AppImage
+APPIMAGE_EXTRACT_AND_RUN=1 ./Faultline-0.1.1-x86_64.AppImage
 ```
 
 ## Runtime requirements and limitations
 
-- Linux x86_64 with glibc 2.35 or newer. The AppImage is built against Ubuntu
+- Linux x86_64 with glibc 2.39 or newer. The AppImage is built against Ubuntu
   22.04; distributions using musl (such as Alpine) are not supported.
 - A working X11 or Wayland desktop session and compatible host graphics drivers.
 - Faultline bundles its Python, PyGObject, GTK 4, libadwaita, and related desktop
@@ -85,5 +85,28 @@ Replacing or deleting the AppImage does not remove either directory. The optiona
 systemd user unit files are included inside the image at
 `usr/share/faultline/systemd/user`; they are not installed or enabled
 automatically. To inspect or install them manually, extract the image with
-`./Faultline-0.1.0-x86_64.AppImage --appimage-extract` and copy the desired
+`./Faultline-0.1.1-x86_64.AppImage --appimage-extract` and copy the desired
 units into `~/.config/systemd/user/`.
+
+
+## Startup diagnostics and benchmark
+
+Set `FAULTLINE_STARTUP_TRACE=1` to print elapsed startup milestones to standard
+error, including bundled Python entry, GTK/libadwaita imports, window construction,
+window mapping, and asynchronous database/UI completion.
+
+For repeatable process-startup measurements after building an AppImage:
+
+```sh
+for run in first warm-1 warm-2; do
+  echo "=== $run ==="
+  /usr/bin/time -f "wall-clock: %e seconds" \
+    dbus-run-session -- xvfb-run -a \
+      env GTK_A11Y=none GDK_BACKEND=x11 FAULTLINE_STARTUP_TRACE=1 \
+      ./Faultline-0.1.1-x86_64.AppImage --smoke-test
+done
+```
+
+The first run is the first process launch in that test session, not a guaranteed
+cold disk-cache measurement. Compare the milestone timings as well as wall-clock
+time; the benchmark does not clear the operating system's page cache.

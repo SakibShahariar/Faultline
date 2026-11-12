@@ -18,7 +18,7 @@ permissions:
 jobs:
   appimage:
     name: Build and smoke-test AppImage
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -68,14 +68,14 @@ jobs:
       - name: Build clean offline smoke-test image
         run: |
           docker build --tag faultline-appimage-smoke - <<'DOCKERFILE'
-          FROM ubuntu:22.04
+          FROM ubuntu:24.04
           ENV DEBIAN_FRONTEND=noninteractive
           RUN apt-get update && apt-get install -y --no-install-recommends \
-              ca-certificates coreutils dbus-x11 xvfb xauth \
+              ca-certificates coreutils dbus-x11 xvfb xauth weston \
               && rm -rf /var/lib/apt/lists/*
           DOCKERFILE
 
-      - name: Test AppImage without host Python or GTK
+      - name: Test AppImage with its bundled GTK runtime on X11 and Wayland
         run: |
           appimage="$PWD/Faultline-$APP_VERSION-x86_64.AppImage"
           state="$RUNNER_TEMP/faultline-appimage-state"
@@ -89,16 +89,35 @@ jobs:
               export XDG_CONFIG_HOME=/tmp/state/config
               /tmp/Faultline.AppImage --cli boots
               test -s /tmp/state/data/faultline/crashes.db
-              set +e
-              timeout 12s dbus-run-session -- xvfb-run -a \
-                env GTK_A11Y=none GDK_BACKEND=x11 /tmp/Faultline.AppImage
-              result=$?
-              set -e
-              if [ "$result" -ne 124 ]; then
-                echo "GUI smoke test exited unexpectedly: $result"
-                exit 1
-              fi
+              dbus-run-session -- xvfb-run -a \
+                env GTK_A11Y=none GDK_BACKEND=x11 /tmp/Faultline.AppImage --smoke-test
+              mkdir -p /tmp/state/runtime
+              chmod 700 /tmp/state/runtime
+              export XDG_RUNTIME_DIR=/tmp/state/runtime
+              weston --backend=headless-backend.so --use-pixman \
+                --socket=wayland-faultline --idle-time=0 --no-config \
+                --log=/tmp/state/weston.log &
+              weston_pid=$!
+              trap "kill $weston_pid 2>/dev/null || true" EXIT
+              for attempt in $(seq 1 50); do
+                test -S "$XDG_RUNTIME_DIR/wayland-faultline" && break
+                sleep 0.1
+              done
+              test -S "$XDG_RUNTIME_DIR/wayland-faultline"
+              dbus-run-session -- env GTK_A11Y=none GDK_BACKEND=wayland \
+                WAYLAND_DISPLAY=wayland-faultline /tmp/Faultline.AppImage --smoke-test
             '
+
+      - name: Measure repeated AppImage startup
+        run: |
+          appimage="$PWD/Faultline-$APP_VERSION-x86_64.AppImage"
+          for run in first warm-1 warm-2; do
+            echo "=== $run process startup ==="
+            /usr/bin/time -f "wall-clock: %e seconds" \
+              dbus-run-session -- xvfb-run -a \
+                env GTK_A11Y=none GDK_BACKEND=x11 FAULTLINE_STARTUP_TRACE=1 \
+                "$appimage" --smoke-test
+          done
 
       - name: Upload AppImage and checksum
         uses: actions/upload-artifact@v4

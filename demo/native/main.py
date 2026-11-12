@@ -2,8 +2,11 @@
 """Faultline native GTK4/libadwaita application."""
 import argparse
 import json
+import os
 import sys
 import threading
+import time
+import traceback
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -15,6 +18,17 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gio, GLib, Gtk
+
+_STARTUP_T0 = float(os.environ.get("FAULTLINE_STARTUP_T0", time.perf_counter()))
+
+
+def startup_trace(event):
+    if os.environ.get("FAULTLINE_STARTUP_TRACE") == "1":
+        elapsed = time.perf_counter() - _STARTUP_T0
+        print(f"[Faultline startup] {event}: {elapsed:.3f}s", file=sys.stderr, flush=True)
+
+
+startup_trace("GTK and libadwaita imported")
 
 
 def evidence_detail(event):
@@ -32,7 +46,7 @@ def evidence_detail(event):
     return "\n".join(lines)
 
 
-from faultline.presentation import load_boot_summary, load_incidents, load_source_status
+
 
 
 INCIDENTS = []
@@ -46,7 +60,7 @@ class FaultlineWindow(Adw.ApplicationWindow):
         super().__init__(**kwargs)
         self.set_title("Faultline")
         self.set_default_size(1120, 760)
-        self.set_size_request(760, 560)
+        startup_trace("window construction started")
 
         self.window_title = Adw.WindowTitle(title="Overview", subtitle="System summary")
         self.stack = Gtk.Stack(
@@ -140,9 +154,12 @@ class FaultlineWindow(Adw.ApplicationWindow):
         self.toast_overlay = Adw.ToastOverlay()
         self.toast_overlay.set_child(split)
         self.set_content(self.toast_overlay)
+        self.connect("map", lambda *_args: startup_trace("main window mapped"))
+        startup_trace("window constructed")
 
         nav_list.select_row(self.nav_rows["overview"])
         self.refresh_data_async()
+        startup_trace("database load scheduled")
 
     def refresh_data_async(self):
         """Read database-backed view models away from the GTK main thread."""
@@ -150,6 +167,7 @@ class FaultlineWindow(Adw.ApplicationWindow):
         self.data_error = None
 
         def load():
+            from faultline.presentation import load_boot_summary, load_incidents, load_source_status
             from faultline.recurrence import find_recurring_events
             from faultline.storage import Database
 
@@ -179,6 +197,7 @@ class FaultlineWindow(Adw.ApplicationWindow):
         global INCIDENTS, BOOT_SUMMARY, SOURCE_STATUS
         self.data_loading = False
         self.data_error = error
+        startup_trace("database load completed")
         if data is not None:
             INCIDENTS = data["incidents"]
             BOOT_SUMMARY = data["boot_summary"]
@@ -198,6 +217,7 @@ class FaultlineWindow(Adw.ApplicationWindow):
         self.pages = {}
         self._build_pages()
         self.show_page(active_page if active_page in self.pages else "overview")
+        startup_trace("first data render completed")
 
         if OPEN_INCIDENT_ID:
             incident = next(
@@ -972,6 +992,7 @@ class FaultlineApplication(Adw.Application):
             application_id="io.github.sakibshahariar.Faultline",
             flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE,
         )
+        self.startup_error = False
 
     def do_command_line(self, command_line):
         global OPEN_INCIDENT_ID
@@ -982,13 +1003,20 @@ class FaultlineApplication(Adw.Application):
         )
         OPEN_INCIDENT_ID = arguments.incident_id
         self.activate()
-        return 0
+        return 1 if self.startup_error else 0
 
     def do_activate(self):
-        window = self.props.active_window
-        if not window:
-            window = FaultlineWindow(application=self)
-        window.present()
+        try:
+            window = self.props.active_window
+            if not window:
+                window = FaultlineWindow(application=self)
+            window.present()
+        except Exception:
+            self.startup_error = True
+            print("Faultline could not construct its graphical interface:", file=sys.stderr)
+            traceback.print_exc()
+            self.quit()
+            return
         if OPEN_INCIDENT_ID:
             incident = next(
                 (item for item in INCIDENTS if item["id"] == OPEN_INCIDENT_ID), None
@@ -1001,4 +1029,5 @@ class FaultlineApplication(Adw.Application):
 
 if __name__ == "__main__":
     app = FaultlineApplication()
-    raise SystemExit(app.run(None))
+    exit_status = app.run(None)
+    raise SystemExit(1 if app.startup_error else exit_status)
