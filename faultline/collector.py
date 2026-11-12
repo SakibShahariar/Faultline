@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from .diagnostics import classify
+from .shutdown import assess_shutdown
 from .sources import SourceError, list_boots, read_boot_events
 from .storage import Database
 
@@ -21,13 +22,14 @@ def scan(database: Database | None = None) -> dict:
 
         summary["boots_seen"] = len(boots)
         for boot in boots:
-            db.upsert_boot(boot)
             try:
                 events = read_boot_events(boot.boot_id)
             except SourceError as exc:
                 db.set_source_status(f"journal:{boot.boot_id}", False, str(exc))
                 summary["source_errors"].append({"source": f"journal:{boot.boot_id}", "error": str(exc)})
                 continue
+            boot.shutdown_status = assess_shutdown(events, current=boot.current)
+            db.upsert_boot(boot)
             db.set_source_status(f"journal:{boot.boot_id}", True, f"{len(events)} records read")
             summary["events_added"] += db.add_events(events)
             findings = classify(events)
