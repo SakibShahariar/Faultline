@@ -17,6 +17,29 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Compile package
         run: python -m compileall -q faultline tests demo/native
+      - name: Build wheel and verify installed assets
+        run: |
+          python -m pip wheel --no-deps . --wheel-dir dist
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          wheel = next(Path("dist").glob("*.whl"))
+          with ZipFile(wheel) as archive:
+              names = set(archive.namelist())
+          required = (
+              "faultline/__init__.py",
+              "faultline_diagnostics-0.1.0.data/data/share/faultline/demo/native/main.py",
+              "faultline_diagnostics-0.1.0.data/data/share/applications/io.github.sakibshahariar.Faultline.desktop",
+              "faultline_diagnostics-0.1.0.data/data/share/metainfo/io.github.sakibshahariar.Faultline.metainfo.xml",
+              "faultline_diagnostics-0.1.0.data/data/share/icons/hicolor/scalable/apps/io.github.sakibshahariar.Faultline.svg",
+              "faultline_diagnostics-0.1.0.data/data/lib/systemd/user/faultline-collector.service",
+          )
+          missing = [path for path in required if path not in names]
+          if missing:
+              raise SystemExit("Wheel is missing installed assets: " + ", ".join(missing))
+          print(f"Verified {len(required)} wheel contents in {wheel.name}")
+          PY
 
   native-smoke:
     runs-on: ubuntu-latest
