@@ -123,6 +123,26 @@ class DiagnosisTests(unittest.TestCase):
         self.assertEqual(finding.category, "oom")
         self.assertEqual(finding.confidence, "high")
 
+    def test_explicit_counter_evidence_lowers_confidence_and_is_separate(self):
+        events = [
+            Event("a" * 32, "2026-11-12T09:30:00+00:00", "kernel",
+                  "Out of memory: Killed process 123"),
+            Event("a" * 32, "2026-11-12T09:31:00+00:00", "faultline-audit",
+                  "No OOM killer activity was recorded in this boot"),
+        ]
+        findings = classify(events)
+        oom = next(item for item in findings if item.category == "oom")
+        self.assertEqual(oom.confidence, "low")
+        self.assertEqual(oom.evidence, ["Out of memory: Killed process 123"])
+        self.assertEqual(
+            oom.contradicting_evidence,
+            ["No OOM killer activity was recorded in this boot"],
+        )
+
+    def test_explicit_negation_alone_does_not_create_a_finding(self):
+        event = Event("a" * 32, "now", "audit", "No kernel panic was recorded")
+        self.assertEqual(classify([event]), [])
+
     def test_duplicate_cross_source_records_do_not_inflate_confidence(self):
         events = [
             Event("c" * 32, "same-time", "kernel", "Out of memory: Killed process 12",
@@ -144,7 +164,7 @@ class StorageTests(unittest.TestCase):
                           "test", signature=signature_for("test"))
             self.assertEqual(db.add_events([event]), 1)
             self.assertEqual(db.add_events([event]), 0)
-            self.assertEqual(db.connection.execute("PRAGMA user_version").fetchone()[0], 3)
+            self.assertEqual(db.connection.execute("PRAGMA user_version").fetchone()[0], 4)
             db.close()
 
 
