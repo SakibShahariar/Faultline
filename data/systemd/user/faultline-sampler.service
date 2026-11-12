@@ -5,7 +5,8 @@ After=default.target
 
 [Service]
 Type=simple
-ExecStart=%h/.local/bin/faultline sampler
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin
+ExecStart=/usr/bin/env faultline sampler
 Restart=on-failure
 RestartSec=10
 Nice=10
