@@ -37,7 +37,7 @@ def load_incidents():
                 ).fetchone()["evidence_json"]
             ))
             events = db.connection.execute("""
-                SELECT timestamp, source, message FROM events
+                SELECT timestamp, source, message, metadata_json FROM events
                 WHERE boot_id = ? ORDER BY timestamp LIMIT 200
             """, (row["boot_id"],)).fetchall()
             events = [event for event in events if event["message"] in evidence_messages]
@@ -61,7 +61,14 @@ def load_incidents():
                 "detail": row["summary"],
                 "confidence": row["confidence"].title(),
                 "evidence": [
-                    (event["timestamp"], event["source"], event["message"])
+                    (
+                        event["timestamp"],
+                        event["source"],
+                        event["message"] + (
+                            "\\nCommand: " + (json.loads(event["metadata_json"]).get("command") or "")
+                            if json.loads(event["metadata_json"]).get("command") else ""
+                        ),
+                    )
                     for event in events
                 ],
                 "causes": [],
