@@ -61,6 +61,18 @@ AppDir:
       - gsettings-desktop-schemas
       - dconf-gsettings-backend
       - shared-mime-info
+      # GTK dynamically loads these optional Wayland and graphics backends.
+      - libwayland-client0
+      - libwayland-cursor0
+      - libwayland-egl1
+      - libwayland-server0
+      - libxkbcommon0
+      - libxkbcommon-x11-0
+      - libegl1
+      - libgl1
+      - libgbm1
+      - libdrm2
+      - libepoxy0
     exclude:
       - humanity-icon-theme
       - ubuntu-mono
