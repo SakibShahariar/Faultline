@@ -50,6 +50,12 @@ def build_report(db: Database, boot_id: str | None = None, redact: bool = True) 
             SELECT category, title, summary, confidence, evidence_json
             FROM findings WHERE boot_id = ? ORDER BY id
         """, (boot["boot_id"],)).fetchall()
+        samples = db.connection.execute("""
+            SELECT captured_at, cpu_percent, memory_used_bytes, memory_total_bytes,
+                   swap_used_bytes, swap_total_bytes, temperature_c, gpu_busy_percent,
+                   metadata_json
+            FROM samples WHERE boot_id = ? ORDER BY captured_at DESC LIMIT 500
+        """, (boot["boot_id"],)).fetchall()
         boot_data = {
             "boot_id": boot["boot_id"],
             "first_seen": boot["first_seen"],
@@ -66,6 +72,20 @@ def build_report(db: Database, boot_id: str | None = None, redact: bool = True) 
                     "evidence": json.loads(row["evidence_json"]),
                 }
                 for row in findings
+            ],
+            "samples": [
+                {
+                    "captured_at": row["captured_at"],
+                    "cpu_percent": row["cpu_percent"],
+                    "memory_used_bytes": row["memory_used_bytes"],
+                    "memory_total_bytes": row["memory_total_bytes"],
+                    "swap_used_bytes": row["swap_used_bytes"],
+                    "swap_total_bytes": row["swap_total_bytes"],
+                    "temperature_c": row["temperature_c"],
+                    "gpu_busy_percent": row["gpu_busy_percent"],
+                    "metadata": json.loads(row["metadata_json"]),
+                }
+                for row in samples
             ],
             "events": [
                 {
@@ -132,6 +152,16 @@ def render_markdown(report: dict) -> str:
             ])
             for evidence in finding["evidence"]:
                 lines.append(f"- Evidence: {evidence}")
+        lines.extend(["", "### Resource samples", ""])
+        if not boot["samples"]:
+            lines.append("No resource samples were recorded for this boot.")
+        for sample in boot["samples"][:50]:
+            lines.append(
+                f"- {sample['captured_at']}: CPU {sample['cpu_percent'] if sample['cpu_percent'] is not None else 'n/a'}%, "
+                f"memory {sample['memory_used_bytes'] if sample['memory_used_bytes'] is not None else 'n/a'} / "
+                f"{sample['memory_total_bytes'] if sample['memory_total_bytes'] is not None else 'n/a'} bytes, "
+                f"temperature {sample['temperature_c'] if sample['temperature_c'] is not None else 'n/a'} °C"
+            )
         lines.extend(["", "### Event evidence", ""])
         for event in boot["events"]:
             lines.append(
