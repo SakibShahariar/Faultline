@@ -14,7 +14,8 @@ def load_incidents(database: Database | None = None) -> list[dict]:
     try:
         rows = db.connection.execute("""
             SELECT f.id, f.boot_id, f.category, f.title, f.summary,
-                   f.confidence, b.boot_index, b.is_current, b.first_seen, b.last_seen
+                   f.confidence, f.contradicting_evidence_json,
+                   b.boot_index, b.is_current, b.first_seen, b.last_seen
             FROM findings AS f
             LEFT JOIN boots AS b ON b.boot_id = f.boot_id
             ORDER BY COALESCE(b.last_seen, f.created_at) DESC, f.id DESC
@@ -76,6 +77,7 @@ def load_incidents(database: Database | None = None) -> list[dict]:
                 "icon": "dialog-warning-symbolic",
                 "detail": row["summary"],
                 "confidence": row["confidence"].title(),
+                "contradicting_evidence": json.loads(row["contradicting_evidence_json"]),
                 "evidence": [
                     (
                         event["timestamp"],
