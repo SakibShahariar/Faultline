@@ -1,9 +1,8 @@
 # Fedora packaging
 
-Faultline is packaged as a noarch RPM. The repository does not yet contain a
-confirmed project license, so the spec currently uses SPDX `NOASSERTION` as a
-placeholder. Do not publish or distribute a release RPM until the project license
-is selected and a matching `LICENSE` file is added.
+Faultline is distributed under the MIT License. The repository's `LICENSE`
+file contains the full terms, and the RPM spec declares the matching SPDX
+identifier `MIT`.
 
 The RPM installs the Python command-line
 tools, native GTK launcher, desktop entry, AppStream metadata, icon, and optional
