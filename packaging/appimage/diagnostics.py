@@ -197,11 +197,17 @@ def benchmark(args):
                             f"{mode_name} trial {index + 1} failed: "
                             f"{sample['combined_output'][-5000:]}"
                         )
-                    if "main window mapped" not in sample["milestones_seconds"]:
+                    required_milestones = ("GTK imported", "main window mapped")
+                    missing_milestones = [
+                        milestone for milestone in required_milestones
+                        if milestone not in sample["milestones_seconds"]
+                    ]
+                    if missing_milestones:
                         raise RuntimeError(
-                            f"{mode_name} trial {index + 1} exited without reaching "
-                            f"the main-window-mapped milestone; this is not a valid "
-                            f"GUI startup sample. output: {sample['combined_output'][-5000:]}"
+                            f"{mode_name} trial {index + 1} did not reach required "
+                            f"startup milestones {missing_milestones}; this is not a "
+                            f"valid GTK GUI startup sample. output: "
+                            f"{sample['combined_output'][-5000:]}"
                         )
 
             for mode_name, samples in samples_by_mode.items():
@@ -226,7 +232,18 @@ def benchmark(args):
         "extracted_appdir_bytes": report["extracted_appdir_bytes"],
         "mount_available": report["mount_available"],
         "modes": {
-            name: mode["median_wall_seconds"]
+            name: {
+                "median_wall_seconds": mode["median_wall_seconds"],
+                "samples": [
+                    {
+                        "trial": sample["trial"],
+                        "wall_seconds": sample["wall_seconds"],
+                        "gtk_import_seconds": sample["milestones_seconds"].get("GTK imported"),
+                        "window_mapped_seconds": sample["milestones_seconds"].get("main window mapped"),
+                    }
+                    for sample in mode["samples"]
+                ],
+            }
             for name, mode in report["modes"].items()
         },
     }, indent=2))
@@ -293,6 +310,13 @@ def profile(args):
         raise SystemExit(
             f"Profile launch failed ({result.returncode}); see {output}/loader-statistics.log"
         )
+    print("=== strace syscall summary ===")
+    print((output / "strace-summary.txt").read_text(encoding="utf-8", errors="replace"))
+    loader_lines = (output / "loader-statistics.log").read_text(
+        encoding="utf-8", errors="replace"
+    ).splitlines()
+    print("=== dynamic-loader statistics (last 100 lines) ===")
+    print("\\n".join(loader_lines[-100:]))
     print(f"Wrote startup profile to {output}")
 
 
