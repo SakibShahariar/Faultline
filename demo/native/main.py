@@ -684,11 +684,28 @@ class FaultlineWindow(Adw.ApplicationWindow):
         self.action_row(group, "Confidence", incident.get("confidence", "Not assessed"))
         self.action_row(group, "Boot ID", incident.get("boot_id", "Unavailable"))
 
-        group = self.group(page, "Evidence timeline",
-                           "Original records collected from the system journal and coredump metadata.")
+        group = self.group(
+            page, "Evidence timeline",
+            "Expand a record to inspect its original message. Related records from overlapping sources are grouped."
+        )
         if incident["evidence"]:
-            for time, title, detail in incident["evidence"]:
-                self.action_row(group, time + "  ·  " + title, detail)
+            if incident.get("evidence_truncated"):
+                self.action_row(
+                    group,
+                    f"Showing {len(incident['evidence'])} of {incident['evidence_count']} records",
+                    "The timeline is capped to keep large incidents responsive. Export a report for the complete stored evidence.",
+                )
+            for time, source, detail in incident["evidence"]:
+                row = Adw.ExpanderRow()
+                row.set_title((time or "Timestamp unavailable") + "  ·  " + source)
+                row.set_subtitle("Expand to inspect original diagnostic evidence")
+                message = Gtk.Label(label=detail, xalign=0, wrap=True, selectable=True)
+                message.set_margin_top(8)
+                message.set_margin_bottom(8)
+                message.set_margin_start(12)
+                message.set_margin_end(12)
+                row.add_row(message)
+                group.add(row)
         else:
             self.action_row(group, "No linked records", "No matching raw event records are stored for this finding.")
 
