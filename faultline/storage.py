@@ -115,6 +115,7 @@ class Database:
 
     def add_findings(self, boot_id: str, findings: Iterable[Finding]) -> None:
         with self.connection:
+            self.connection.execute("DELETE FROM findings WHERE boot_id = ?", (boot_id,))
             self.connection.executemany("""
                 INSERT INTO findings(boot_id,category,title,summary,confidence,evidence_json)
                 VALUES(?,?,?,?,?,?)
