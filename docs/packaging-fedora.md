@@ -1,6 +1,11 @@
 # Fedora packaging
 
-Faultline is packaged as a noarch RPM. The RPM installs the Python command-line
+Faultline is packaged as a noarch RPM. The repository does not yet contain a
+confirmed project license, so the spec currently uses SPDX `NOASSERTION` as a
+placeholder. Do not publish or distribute a release RPM until the project license
+is selected and a matching `LICENSE` file is added.
+
+The RPM installs the Python command-line
 tools, native GTK launcher, desktop entry, AppStream metadata, icon, and optional
 systemd **user** units. It does not enable background collection automatically.
 
