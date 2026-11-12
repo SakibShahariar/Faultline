@@ -144,6 +144,8 @@ def run_sampler() -> None:
         while not stopped:
             started = time.monotonic()
             settings = load_settings()
+            if not settings["background_sampler"]:
+                break
             sample, previous_cpu = collect_sample(previous_cpu)
             db.add_sample(sample)
             db.set_source_status("sampler", True, "Last sample at " + sample["captured_at"])
