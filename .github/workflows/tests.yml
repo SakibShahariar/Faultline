@@ -131,7 +131,7 @@ jobs:
             exit 1
           fi
           mkdir -p "$HOME/.local/share/faultline"
-          printf 'keep-user-data\\n' > "$HOME/.local/share/faultline/keep.txt"
+          printf 'keep-user-data\n' > "$HOME/.local/share/faultline/keep.txt"
           dnf remove -y faultline
           test -f "$HOME/.local/share/faultline/keep.txt"
           test ! -f /usr/lib/systemd/user/faultline-collector.timer
