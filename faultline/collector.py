@@ -5,6 +5,7 @@ from .coredumps import list_coredump_events
 from .diagnostics import classify
 from .extensions import (
     correlate_extension_events,
+    describe_enabled_extensions,
     is_extension_error_candidate,
     is_shell_failure,
     list_enabled_extensions,
@@ -72,9 +73,20 @@ def scan(database: Database | None = None, notify: bool = False) -> dict:
             try:
                 enabled_extensions = list_enabled_extensions()
                 extensions_ok = True
+                extension_details = describe_enabled_extensions(enabled_extensions)
+                labels = [
+                    item["name"] + (
+                        f" v{item['version']}" if item.get("version") is not None else ""
+                    )
+                    for item in extension_details[:12]
+                ]
+                inventory = ", ".join(labels)
+                if len(extension_details) > 12:
+                    inventory += f", and {len(extension_details) - 12} more"
                 db.set_source_status(
                     "gnome-extensions", True,
-                    f"{len(enabled_extensions)} enabled extension(s) discovered"
+                    f"{len(enabled_extensions)} enabled extension(s)" +
+                    (": " + inventory if inventory else "")
                 )
             except SourceError as exc:
                 db.set_source_status("gnome-extensions", False, str(exc))
