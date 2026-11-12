@@ -39,6 +39,16 @@ class JournalParserTests(unittest.TestCase):
         self.assertEqual(boots[0].first_seen, "Mon 2026-11-10 08:00:00")
         self.assertEqual(boots[0].last_seen, "Mon 2026-11-10 09:00:00")
 
+    def test_parses_boot_with_incomplete_last_entry_as_unknown(self):
+        boot_id = "c" * 32
+        boots = parse_boot_list([
+            "-1 " + boot_id + " Mon 2026-11-10 08:00:00"
+        ])
+        self.assertEqual(len(boots), 1)
+        self.assertEqual(boots[0].boot_id, boot_id)
+        self.assertIsNone(boots[0].last_seen)
+        self.assertFalse(boots[0].current)
+
     def test_parses_journal_json(self):
         fixture = Path(__file__).parent / "fixtures" / "journal" / "oom.json"
         row = json.loads(fixture.read_text(encoding="utf-8"))
