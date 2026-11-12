@@ -157,6 +157,14 @@ def scan(database: Database | None = None) -> dict:
             if pstore_events:
                 summary["events_added"] += db.add_events(pstore_events)
                 _merge_findings(findings_by_category, pstore_events)
+                shutdown_evidence.extend(
+                    event for event in pstore_events
+                    if any(marker in event.message.lower() for marker in (
+                        "kernel panic", "oops:", "watchdog:", "soft lockup",
+                        "hard lockup", "bug: unable to handle",
+                        "general protection fault",
+                    ))
+                )
 
             if journal_ok:
                 boot.shutdown_status = assess_shutdown(shutdown_evidence, current=boot.current)
