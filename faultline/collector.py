@@ -43,6 +43,10 @@ def _merge_findings(target: dict[str, Finding], batch: list[Event]) -> None:
             "low" if existing.contradicting_evidence else
             ("high" if len(existing.evidence) > 1 else "moderate")
         )
+    for finding in target.values():
+        finding.contradicting_evidence = finding.contradicting_evidence[:20]
+        if finding.contradicting_evidence:
+            finding.confidence = "low"
 
 
 def scan(database: Database | None = None, notify: bool = False) -> dict:
