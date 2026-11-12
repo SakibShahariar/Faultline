@@ -623,7 +623,8 @@ class FaultlineWindow(Adw.ApplicationWindow):
 
         group = self.group(page, "Assessment", incident["detail"])
         self.action_row(group, "Severity", suffix=self.status_label(
-            incident["severity"], self.severity_style(incident["severity"])))        self.action_row(group, "Confidence", incident.get("confidence", "Not assessed"))
+            incident["severity"], self.severity_style(incident["severity"])))
+        self.action_row(group, "Confidence", incident.get("confidence", "Not assessed"))
         self.action_row(group, "Boot ID", incident.get("boot_id", "Unavailable"))
 
         group = self.group(
