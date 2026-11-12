@@ -42,13 +42,23 @@ class JournalStreamingTests(unittest.TestCase):
             + json.dumps({"MESSAGE": "second", "__REALTIME_TIMESTAMP": "2000000"}) + "\n"
         ).encode()
         fake = FakeProcess(payload)
+        captured = {}
+
+        def fake_popen(command, **_kwargs):
+            captured["command"] = command
+            return fake
+
         with (
             patch("faultline.sources.shutil.which", return_value="/usr/bin/journalctl"),
-            patch("faultline.sources.subprocess.Popen", return_value=fake),
+            patch("faultline.sources.subprocess.Popen", side_effect=fake_popen),
         ):
-            events = list(iter_boot_events(boot_id))
+            events = list(iter_boot_events(
+                boot_id, since="2026-11-12 09:00:00", until="2026-11-12 10:00:00"
+            ))
         self.assertEqual([event.message for event in events], ["first", "second"])
         self.assertTrue(all(event.boot_id == boot_id for event in events))
+        self.assertIn("--since=2026-11-12 09:00:00", captured["command"])
+        self.assertIn("--until=2026-11-12 10:00:00", captured["command"])
 
 
 if __name__ == "__main__":
