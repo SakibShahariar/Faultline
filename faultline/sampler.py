@@ -100,6 +100,31 @@ def _read_disk_counters(proc_root: Path, sys_root: Path) -> tuple[int | None, in
     return read_bytes, written_bytes, io_time_ms, devices
 
 
+def _read_disk_errors(proc_root: Path, sys_root: Path) -> tuple[int | None, int]:
+    try:
+        lines = (proc_root / "diskstats").read_text(encoding="ascii").splitlines()
+    except OSError:
+        return None, 0
+    total = 0
+    devices = 0
+    for line in lines:
+        parts = line.split()
+        if len(parts) < 3:
+            continue
+        device = parts[2]
+        if (sys_root / "class/block" / device / "partition").exists():
+            continue
+        counter = sys_root / "class/block" / device / "device/ioerr_cnt"
+        try:
+            value = int(counter.read_text(encoding="ascii").strip())
+        except (OSError, ValueError):
+            continue
+        if value >= 0:
+            total += value
+            devices += 1
+    return (total if devices else None), devices
+
+
 def collect_sample(
     previous_cpu: tuple[int, int] | None = None,
     proc_root: Path = Path("/proc"),
@@ -126,6 +151,7 @@ def collect_sample(
     disk_read_bytes, disk_write_bytes, disk_io_time_ms, disk_devices = _read_disk_counters(
         proc_root, sys_root
     )
+    disk_io_errors, disk_error_devices = _read_disk_errors(proc_root, sys_root)
     try:
         boot_id = (proc_root / "sys/kernel/random/boot_id").read_text().strip()
         if not _BOOT_ID_RE.fullmatch(boot_id):
@@ -150,6 +176,8 @@ def collect_sample(
             "disk_write_bytes": disk_write_bytes,
             "disk_io_time_ms": disk_io_time_ms,
             "disk_devices_sampled": disk_devices,
+            "disk_io_errors": disk_io_errors,
+            "disk_error_devices_sampled": disk_error_devices,
             "cpu_available": counters is not None and previous_cpu is not None,
             "memory_available": mem_total is not None and mem_available is not None,
             "swap_available": swap_total is not None and swap_free is not None,
