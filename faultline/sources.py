@@ -149,7 +149,7 @@ def iter_boot_events(
             last_activity = time.monotonic()
             pending.extend(chunk)
             while True:
-                newline = pending.find(b"\\n")
+                newline = pending.find(b"\n")
                 if newline < 0:
                     break
                 line = pending[:newline].decode("utf-8", errors="replace")
