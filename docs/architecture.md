@@ -26,6 +26,10 @@ require administrator privileges.
   `~/.config/faultline/settings.json`), written atomically with mode 0600.
 - **Reports** — user-initiated Markdown/JSON export. Redaction is enabled by default
   and can be configured in the UI; nothing is uploaded automatically.
+- **Notifications** — the scheduled collector dispatches a detached notification
+  listener only for newly inserted findings. Notifications can be disabled or
+  severity-filtered and open the matching incident through the GUI command-line
+  activation path.
 
 ## Data flow
 
@@ -73,7 +77,7 @@ on a guess. Resource samples have a separate configurable retention window.
 
 ## Current limitations
 
-The sampler and basic cross-boot recurrence queries are implemented. Next-login
-notifications, richer incident recurrence analysis, and Fedora RPM packaging remain
-unimplemented. The application reports these features as unavailable rather than
+The sampler, actionable next-login notifications, and basic cross-boot recurrence
+queries are implemented. Richer incident recurrence analysis and Fedora RPM
+packaging remain unimplemented. The application reports these features as unavailable rather than
 simulating data.
