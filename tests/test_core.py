@@ -92,6 +92,16 @@ class DiagnosisTests(unittest.TestCase):
         self.assertEqual(finding.category, "oom")
         self.assertEqual(finding.confidence, "high")
 
+    def test_duplicate_cross_source_records_do_not_inflate_confidence(self):
+        events = [
+            Event("c" * 32, "same-time", "kernel", "Out of memory: Killed process 12",
+                  signature="same-signature"),
+            Event("c" * 32, "same-time", "systemd", "Out of memory: Killed process 12",
+                  signature="same-signature"),
+        ]
+        finding = classify(events)[0]
+        self.assertEqual(finding.confidence, "moderate")
+
 
 class StorageTests(unittest.TestCase):
     def test_database_migrates_and_deduplicates(self):
