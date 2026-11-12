@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from .coredumps import list_coredump_events
-from .diagnostics import classify
+from .diagnostics import COUNTER_RULES, classify
 from .extensions import (
     correlate_extension_events,
     describe_enabled_extensions,
@@ -21,6 +21,11 @@ BATCH_SIZE = 500
 
 
 def _merge_findings(target: dict[str, Finding], batch: list[Event]) -> None:
+    for event in batch:
+        for category, pattern in COUNTER_RULES.items():
+            if category in target and pattern.search(event.message):
+                if event.message not in target[category].contradicting_evidence:
+                    target[category].contradicting_evidence.append(event.message[:500])
     for finding in classify(batch):
         existing = target.get(finding.category)
         if existing is None:
