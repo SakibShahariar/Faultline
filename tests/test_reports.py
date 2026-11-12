@@ -45,6 +45,8 @@ class ReportTests(unittest.TestCase):
             md_path = write_report(Path(directory) / "report.md", report, "markdown")
             self.assertTrue(json.loads(json_path.read_text())["boots"])
             self.assertIn("Out of memory", md_path.read_text())
+            self.assertEqual(json_path.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(md_path.stat().st_mode & 0o777, 0o600)
             unredacted = build_report(db, redact=False)
             self.assertIn("alice", json.dumps(unredacted))
             db.close()
