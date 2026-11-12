@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.sakibshahariar.Faultline</id>
+  <name>Faultline</name>
+  <summary>Local-first Linux crash diagnosis and system forensics</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <description>
+    <p>Faultline examines systemd boot history, journals, coredump metadata, retained kernel crash records, and desktop errors to help explain Linux failures.</p>
+    <p>Findings keep supporting evidence and uncertainty visible. Collection runs as the current user and diagnostic data stays local.</p>
+  </description>
+  <launchable type="desktop-id">io.github.sakibshahariar.Faultline.desktop</launchable>
+  <provides>
+    <binary>faultline</binary>
+    <binary>faultline-gui</binary>
+  </provides>
+  <url type="homepage">https://github.com/SakibShahariar/Faultline</url>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.1.0" date="2026-11-12">
+      <description><p>Initial development release.</p></description>
+    </release>
+  </releases>
+</component>
