@@ -110,3 +110,7 @@ the system's existing permissions.
 
 See [docs/architecture.md](docs/architecture.md) for module boundaries, data flow,
 permissions, and diagnostic interpretation.
+
+## License
+
+Faultline is licensed under the [MIT License](LICENSE).
