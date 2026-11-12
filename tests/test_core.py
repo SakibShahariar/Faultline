@@ -18,6 +18,12 @@ class SignatureTests(unittest.TestCase):
     def test_signature_is_stable(self):
         self.assertEqual(signature_for("oom-kill pid=123"), signature_for("oom-kill pid=456"))
 
+    def test_signature_links_the_same_record_across_sources(self):
+        self.assertEqual(
+            signature_for("Out of memory: Killed process 123", "kernel"),
+            signature_for("Out of memory: Killed process 456", "systemd"),
+        )
+
 
 class JournalParserTests(unittest.TestCase):
     def test_parses_boot_history(self):
