@@ -10,7 +10,7 @@ from typing import Iterable
 
 from .models import Boot, Event, Finding
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 def default_database_path() -> Path:
@@ -85,6 +85,26 @@ class Database:
                     );
                     PRAGMA user_version = 1;
                 """)
+        if version < 2:
+            with self.connection:
+                self.connection.executescript("""
+                    CREATE TABLE samples (
+                        id INTEGER PRIMARY KEY,
+                        boot_id TEXT NOT NULL,
+                        captured_at TEXT NOT NULL,
+                        cpu_percent REAL,
+                        memory_used_bytes INTEGER,
+                        memory_total_bytes INTEGER,
+                        swap_used_bytes INTEGER,
+                        swap_total_bytes INTEGER,
+                        temperature_c REAL,
+                        gpu_busy_percent REAL,
+                        metadata_json TEXT NOT NULL DEFAULT '{}'
+                    );
+                    CREATE INDEX samples_time ON samples(captured_at);
+                    CREATE INDEX samples_boot_time ON samples(boot_id, captured_at);
+                    PRAGMA user_version = 2;
+                """)
 
     def upsert_boot(self, boot: Boot) -> None:
         with self.connection:
@@ -137,6 +157,37 @@ class Database:
                     VALUES(?,?,?,?,?,?)
                 """, [(boot_id, f.category, f.title, f.summary, f.confidence,
                        json.dumps(f.evidence)) for f in rows])
+
+    def add_sample(self, sample: dict) -> None:
+        with self.connection:
+            self.connection.execute("""
+                INSERT INTO samples(
+                    boot_id,captured_at,cpu_percent,memory_used_bytes,memory_total_bytes,
+                    swap_used_bytes,swap_total_bytes,temperature_c,gpu_busy_percent,metadata_json
+                ) VALUES(?,?,?,?,?,?,?,?,?,?)
+            """, (
+                sample["boot_id"], sample["captured_at"], sample.get("cpu_percent"),
+                sample.get("memory_used_bytes"), sample.get("memory_total_bytes"),
+                sample.get("swap_used_bytes"), sample.get("swap_total_bytes"),
+                sample.get("temperature_c"), sample.get("gpu_busy_percent"),
+                json.dumps(sample.get("metadata", {}), sort_keys=True),
+            ))
+
+    def latest_samples(self, limit: int = 100) -> list[sqlite3.Row]:
+        limit = max(1, min(int(limit), 1000))
+        return self.connection.execute(
+            "SELECT * FROM samples ORDER BY captured_at DESC LIMIT ?", (limit,)
+        ).fetchall()
+
+    def prune_samples(self, retention_hours: int) -> int:
+        cutoff = (datetime.now().astimezone() - timedelta(
+            hours=max(1, min(int(retention_hours), 720))
+        )).isoformat()
+        with self.connection:
+            cursor = self.connection.execute(
+                "DELETE FROM samples WHERE captured_at < ?", (cutoff,)
+            )
+            return cursor.rowcount
 
     def set_source_status(self, source: str, available: bool, detail: str) -> None:
         with self.connection:
