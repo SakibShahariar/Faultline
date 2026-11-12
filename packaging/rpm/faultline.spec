@@ -4,7 +4,7 @@ Release:        1%{?dist}
 Summary:        Local-first Linux crash diagnosis and system forensics
 License:        MIT
 URL:            https://github.com/SakibShahariar/Faultline
-Source0:        %{url}/archive/refs/tags/v%{version}.tar.gz
+Source0:        Faultline-%{version}.tar.gz
 
 BuildArch:      noarch
 BuildRequires:  python3-devel
