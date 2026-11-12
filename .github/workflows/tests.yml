@@ -65,7 +65,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install Fedora RPM build dependencies
         run: |
-          dnf install -y rpm-build redhat-rpm-config pyproject-rpm-macros \
+          dnf install -y nodejs git rpm-build redhat-rpm-config pyproject-rpm-macros \
             python3-devel python3-pip python3-setuptools python3-gobject \
             gtk4 libadwaita systemd-rpm-macros tar gzip
       - name: Create source archive from the checked-out commit
