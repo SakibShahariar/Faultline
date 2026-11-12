@@ -13,7 +13,7 @@ class CoredumpParserTests(unittest.TestCase):
         events = parse_coredump_json(json.dumps([record]))
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0].event_type, "coredump")
-        self.assertEqual(events[0].metadata["executable"], "/usr/bin/example")
+        self.assertEqual(events[0].metadata["executable"], "/usr/bin/demo-app")
         self.assertNotIn("secret", str(events[0].metadata["command"]))
         self.assertIn("--token=<redacted>", events[0].metadata["command"])
         self.assertIn("--password <redacted>", events[0].metadata["command"])
