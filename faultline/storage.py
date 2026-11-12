@@ -11,7 +11,7 @@ from typing import Iterable
 from .models import Boot, Event, Finding
 from .signatures import signature_for
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 def default_database_path() -> Path:
@@ -117,6 +117,13 @@ class Database:
                      for row in rows],
                 )
                 self.connection.execute("PRAGMA user_version = 3")
+        if version < 4:
+            with self.connection:
+                self.connection.execute(
+                    "ALTER TABLE findings ADD COLUMN contradicting_evidence_json "
+                    "TEXT NOT NULL DEFAULT '[]'"
+                )
+                self.connection.execute("PRAGMA user_version = 4")
 
     def upsert_boot(self, boot: Boot) -> None:
         with self.connection:
@@ -197,22 +204,26 @@ class Database:
             new_findings = []
             for finding in rows:
                 evidence_json = json.dumps(finding.evidence)
+                contradicting_json = json.dumps(finding.contradicting_evidence)
                 existing = self.connection.execute("""
                     SELECT id FROM findings WHERE boot_id = ? AND category = ? AND title = ?
                     ORDER BY id LIMIT 1
                 """, (boot_id, finding.category, finding.title)).fetchone()
                 if existing:
                     self.connection.execute("""
-                        UPDATE findings SET summary = ?, confidence = ?, evidence_json = ?
+                        UPDATE findings SET summary = ?, confidence = ?, evidence_json = ?,
+                            contradicting_evidence_json = ?
                         WHERE id = ?
-                    """, (finding.summary, finding.confidence, evidence_json, existing["id"]))
+                    """, (finding.summary, finding.confidence, evidence_json,
+                          contradicting_json, existing["id"]))
                 else:
                     cursor = self.connection.execute("""
                         INSERT INTO findings(
-                            boot_id,category,title,summary,confidence,evidence_json
-                        ) VALUES(?,?,?,?,?,?)
+                            boot_id,category,title,summary,confidence,evidence_json,
+                            contradicting_evidence_json
+                        ) VALUES(?,?,?,?,?,?,?)
                     """, (boot_id, finding.category, finding.title, finding.summary,
-                          finding.confidence, evidence_json))
+                          finding.confidence, evidence_json, contradicting_json))
                     new_findings.append({
                         "id": cursor.lastrowid,
                         "boot_id": boot_id,
@@ -220,6 +231,7 @@ class Database:
                         "title": finding.title,
                         "summary": finding.summary,
                         "confidence": finding.confidence,
+                        "contradicting_evidence": finding.contradicting_evidence,
                     })
             return new_findings
 
