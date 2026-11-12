@@ -456,6 +456,17 @@ class FaultlineWindow(Adw.ApplicationWindow):
         )
         self.sampler_switch = sampler_row
         group.add(sampler_row)
+        for title, key, minimum, maximum in [
+            ("Sampling interval (seconds)", "sample_interval_seconds", 2, 300),
+            ("Sample history (hours)", "sample_retention_hours", 1, 720),
+        ]:
+            row = Adw.ActionRow()
+            row.set_title(title)
+            spin = Gtk.SpinButton.new_with_range(minimum, maximum, 1)
+            spin.set_value(settings[key])
+            spin.connect("value-changed", self.on_setting_number, key)
+            row.add_suffix(spin)
+            group.add(row)
 
         group = self.group(page, "Storage and retention",
                            "Older boot records are pruned after a successful scan. Unknown timestamps are retained.")
