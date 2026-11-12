@@ -396,12 +396,14 @@ class FaultlineWindow(Adw.ApplicationWindow):
             status = SOURCE_STATUS.get(source)
             disabled = bool(status and status["detail"].startswith("Disabled in Faultline settings"))
             state = ("Disabled" if disabled else
-                     ("Available" if status["available"] else "Unavailable")) if status else (
+                     ("Stale" if status["available"] and status.get("stale") else
+                      ("Available" if status["available"] else "Unavailable"))) if status else (
                          "Checking…" if self.data_loading else
                          ("Unavailable" if self.data_error else fallback)
                      )
             style = ("dim-label" if disabled else
-                     ("success" if status and status["available"] else "warning" if status else "dim-label"))
+                     ("warning" if status and (not status["available"] or status.get("stale")) else
+                      "success" if status else "dim-label"))
             subtitle = (
                 status["detail"] + " · checked " + status["checked_at"]
                 if status else None
@@ -417,8 +419,9 @@ class FaultlineWindow(Adw.ApplicationWindow):
                 group, "Enabled extension inventory",
                 extension_status["detail"] + " · checked " + extension_status["checked_at"],
                 self.status_label(
-                    "Available" if extension_status["available"] else "Unavailable",
-                    "success" if extension_status["available"] else "warning",
+                    "Stale" if extension_status["available"] and extension_status.get("stale") else
+                    ("Available" if extension_status["available"] else "Unavailable"),
+                    "warning" if not extension_status["available"] or extension_status.get("stale") else "success",
                 ),
             )
         extension_incidents = [
