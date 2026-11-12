@@ -29,6 +29,7 @@ class StorageMigrationTests(unittest.TestCase):
                 signature="legacy-source-prefixed-signature",
             )])
             db.connection.execute("DROP TABLE samples")
+            db.connection.execute("ALTER TABLE findings DROP COLUMN contradicting_evidence_json")
             db.connection.execute("PRAGMA user_version = 1")
             db.close()
 
