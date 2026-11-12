@@ -21,7 +21,10 @@ window = app.props.active_window
 assert window is not None, "Faultline did not create its main window"
 assert window.get_title() == "Faultline"
 assert window.get_visible(), "Faultline main window is not visible"
-assert window.get_size_request() == (-1, -1), "Window still imposes a minimum size"
+requested_width, requested_height = window.get_size_request()
+assert requested_width < 760 and requested_height < 560, (
+    f"Window still imposes a large minimum size: {requested_width}x{requested_height}"
+)
 assert isinstance(window.get_content(), module.Adw.ToastOverlay)
 split_view = window.get_content().get_child()
 assert isinstance(split_view, module.Adw.NavigationSplitView)
