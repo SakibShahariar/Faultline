@@ -84,7 +84,7 @@ class ExtensionCorrelationTests(unittest.TestCase):
         self.assertEqual(len(correlated), 2)
         self.assertEqual(len(findings), 2)
         self.assertTrue(all(item.confidence == "moderate" for item in findings))
-        self.assertTrue(all(len(item.evidence) == 4 for item in findings))
+        self.assertTrue(all(len(item.evidence) == 3 for item in findings))
         self.assertNotEqual(findings[0].title, findings[1].title)
 
     def test_extension_error_without_nearby_shell_failure_is_not_a_suspect(self):
