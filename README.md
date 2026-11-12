@@ -4,30 +4,28 @@
 
 Faultline is a planned native GTK4/libadwaita application for understanding Linux crashes, unexpected shutdowns, and desktop failures. It will correlate system logs, coredumps, boot records, and optional resource history to present evidence-based explanations.
 
-## Interface prototype
+## Native UI prototype
 
-Open the [interactive UI prototype](demo/index.html) in a browser.
+The primary design reference is the [native GTK4/libadwaita prototype](demo/native/main.py). It uses real libadwaita widgets rather than CSS imitations.
 
-The prototype is a visual and interaction reference for a GNOME desktop app. Its layout is based on libadwaita patterns: a compact header bar, split-view navigation, grouped content, restrained status styling, preference groups and action rows, and responsive navigation. It intentionally avoids a generic analytics-dashboard look.
+On Fedora, install the dependencies and launch it:
 
-It is still HTML/CSS/JavaScript, not a native GTK application. Browser controls only approximate the appearance and behavior of libadwaita widgets; the native implementation should use the real GTK4 and libadwaita components.
+```sh
+sudo dnf install gtk4 libadwaita python3-gobject
+python3 demo/native/main.py
+```
 
-All incidents, system metrics, extension activity, and timestamps shown are fictional sample data. Buttons and controls demonstrate navigation and interaction only; the prototype does not inspect or modify the host system.
+See [native demo setup](demo/native/README.md) for details.
 
-### Screens and flows
+The native prototype includes Overview, Incidents, Incident Details, System Health, Extensions, Reports, and Preferences. It uses a GNOME-style header bar and split navigation, grouped preference pages, action rows, switch rows, native alert dialogs, and toast notifications.
 
-- **Overview** — system stability, recent incidents, resource snapshot, and findings that need attention.
-- **Incidents** — searchable and filterable incident history.
-- **Incident details** — evidence timeline, interpretation, confidence, possible explanations, and next steps.
-- **System health** — resource history and availability of diagnostic sources.
-- **GNOME extensions** — extension activity around Shell incidents, with correlation clearly separated from proof.
-- **Reports** — report creation and privacy guidance.
-- **Preferences** — general behavior, collection, privacy, notifications, and storage.
-- **Dialogs** — scan, monitoring, report export, data clearing, and About.
+A [browser-based interactive prototype](demo/index.html) is also available for quick preview. It is secondary to the native demo and only approximates libadwaita visually.
+
+All incidents, system metrics, extension activity, and timestamps shown in both prototypes are fictional sample data. Neither prototype inspects or modifies the host system.
 
 ## Product direction
 
-The prototype is an interaction and layout roadmap for the native application. The intended implementation is:
+The prototypes are an interaction and layout roadmap for the actual application. The intended implementation is:
 
 - GTK4 and libadwaita for the desktop interface.
 - A small background collector, separate from the GUI.
@@ -43,4 +41,4 @@ Some diagnostic sources are not readable by an ordinary user on every distributi
 
 ## Development status
 
-The repository currently contains a browser-based interface prototype and product roadmap. The native application, collector, database, and real diagnostic engine are not implemented yet.
+The repository currently contains UI prototypes and a product roadmap. The production collector, database, and real diagnostic engine are not implemented yet.
