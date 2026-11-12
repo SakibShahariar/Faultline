@@ -860,8 +860,19 @@ class FaultlineApplication(Adw.Application):
     def __init__(self):
         super().__init__(
             application_id="io.github.sakibshahariar.Faultline",
-            flags=Gio.ApplicationFlags.DEFAULT_FLAGS,
+            flags=Gio.ApplicationFlags.HANDLES_COMMAND_LINE,
         )
+
+    def do_command_line(self, command_line):
+        global OPEN_INCIDENT_ID
+        argument_parser = argparse.ArgumentParser(prog="faultline-gui", add_help=False)
+        argument_parser.add_argument("--incident-id")
+        arguments, _unknown = argument_parser.parse_known_args(
+            command_line.get_arguments()[1:]
+        )
+        OPEN_INCIDENT_ID = arguments.incident_id
+        self.activate()
+        return 0
 
     def do_activate(self):
         window = self.props.active_window
@@ -879,9 +890,5 @@ class FaultlineApplication(Adw.Application):
 
 
 if __name__ == "__main__":
-    argument_parser = argparse.ArgumentParser(prog="faultline-gui")
-    argument_parser.add_argument("--incident-id")
-    arguments, _unknown = argument_parser.parse_known_args()
-    OPEN_INCIDENT_ID = arguments.incident_id
     app = FaultlineApplication()
-    raise SystemExit(app.run([sys.argv[0]]))
+    raise SystemExit(app.run(None))
