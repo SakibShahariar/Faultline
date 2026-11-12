@@ -98,21 +98,34 @@ def parse_journal_json(lines: Iterable[str], boot_id: str) -> list[Event]:
     return events
 
 
-def read_boot_events(boot_id: str, since: str | None = None) -> list[Event]:
+def read_boot_events(
+    boot_id: str, since: str | None = None, until: str | None = None
+) -> list[Event]:
     command = ["journalctl", f"--boot={boot_id}", "--output=json", "--no-pager",
                "--quiet"]
     if since:
         command.append(f"--since={since}")
+    if until:
+        command.append(f"--until={until}")
     result = _run(command, timeout=90)
     return parse_journal_json(result.stdout.splitlines(), boot_id)
 
 
 
-def iter_boot_events(boot_id: str, timeout: int = 90):
+def iter_boot_events(
+    boot_id: str,
+    since: str | None = None,
+    until: str | None = None,
+    timeout: int = 90,
+):
     """Yield journal events one JSON record at a time with a bounded idle timeout."""
     import os
 
     command = ["journalctl", f"--boot={boot_id}", "--output=json", "--no-pager", "--quiet"]
+    if since:
+        command.append(f"--since={since}")
+    if until:
+        command.append(f"--until={until}")
     if not shutil.which(command[0]):
         raise SourceError(f"Required command not found: {command[0]}")
     process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
