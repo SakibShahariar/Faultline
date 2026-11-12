@@ -166,6 +166,7 @@ def scan(database: Database | None = None) -> dict:
             if journal_ok:
                 db.add_findings(boot.boot_id, findings)
                 summary["findings"] += len(findings)
+        summary["boots_pruned"] = db.prune_old_boots(settings["retention_days"])
         return summary
     finally:
         if own_database:
