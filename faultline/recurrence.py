@@ -13,6 +13,8 @@ def find_recurring_events(db: Database, minimum_boots: int = 2) -> list[dict]:
                MIN(timestamp) AS first_seen,
                MAX(timestamp) AS last_seen,
                MIN(source) AS source,
+               GROUP_CONCAT(DISTINCT source) AS sources,
+               COUNT(DISTINCT source) AS source_count,
                MIN(message) AS example
         FROM events
         WHERE signature != ''
