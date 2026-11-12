@@ -41,10 +41,11 @@ sudo dnf install python3 python3-pip python3-gobject gtk4 libadwaita systemd
 Install Faultline from a checkout:
 
 ```sh
-python3 -m pip install --user -e .
-faultline scan
-faultline boots
-faultline-gui
+python3 -m venv --system-site-packages .venv
+.venv/bin/python -m pip install -e .
+.venv/bin/faultline scan
+.venv/bin/faultline boots
+.venv/bin/faultline-gui
 ```
 
 Run automated checks:
