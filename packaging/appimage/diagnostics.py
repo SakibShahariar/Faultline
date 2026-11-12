@@ -256,69 +256,106 @@ def profile(args):
     strace = shutil.which("strace")
     if not strace:
         raise SystemExit("strace is required for the optional AppImage profile")
-    command = [
-        "dbus-run-session", "--", "xvfb-run", "-a", "env",
-        "GTK_A11Y=none", "GDK_BACKEND=x11", "FAULTLINE_STARTUP_TRACE=1",
-        "LD_DEBUG=statistics", str(image), "--smoke-test",
-    ]
-    traced = [
-        strace, "-f", "-c", "-w", "-o",
-        str(output / "strace-summary.txt"), "--",
-        *command,
-    ]
-    env = os.environ.copy()
-    result = subprocess.run(
-        traced,
-        env=env,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        timeout=120,
-        check=False,
-    )
-    fallback_used = False
-    if result.returncode != 0:
-        fallback_used = True
-        fallback_command = [
-            "dbus-run-session", "--", "xvfb-run", "-a", "env",
-            "GTK_A11Y=none", "GDK_BACKEND=x11",
-            "FAULTLINE_STARTUP_TRACE=1", "LD_DEBUG=statistics",
-            "APPIMAGE_EXTRACT_AND_RUN=1", str(image), "--smoke-test",
-        ]
-        fallback_traced = [
-            strace, "-f", "-c", "-w", "-o",
-            str(output / "strace-summary.txt"), "--",
-            *fallback_command,
-        ]
-        result = subprocess.run(
-            fallback_traced,
-            env=env,
-            text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            timeout=120,
-            check=False,
-        )
-    (output / "loader-statistics.log").write_text(
-        result.stderr + "\n" + result.stdout, encoding="utf-8"
-    )
-    (output / "profile-exit-status.txt").write_text(
-        f"returncode={result.returncode}\nfallback_used={fallback_used}\n",
-        encoding="utf-8",
-    )
-    if result.returncode != 0:
-        raise SystemExit(
-            f"Profile launch failed ({result.returncode}); see {output}/loader-statistics.log"
-        )
-    print("=== strace syscall summary ===")
-    print((output / "strace-summary.txt").read_text(encoding="utf-8", errors="replace"))
-    loader_lines = (output / "loader-statistics.log").read_text(
-        encoding="utf-8", errors="replace"
-    ).splitlines()
-    print("=== dynamic-loader statistics (last 100 lines) ===")
-    print("\\n".join(loader_lines[-100:]))
-    print(f"Wrote startup profile to {output}")
 
+    env = os.environ.copy()
+    env.update({
+        "GTK_A11Y": "none",
+        "GDK_BACKEND": "x11",
+        "FAULTLINE_STARTUP_TRACE": "1",
+    })
+
+    with tempfile.TemporaryDirectory(prefix="faultline-appimage-profile-") as temporary:
+        extracted = extract_appimage(image, Path(temporary) / "extract")
+        targets = [
+            ("appimage_runtime", image, False),
+            ("extracted_appdir_launcher", extracted / "AppRun", True),
+        ]
+        summaries = {}
+
+        for mode_name, executable, direct in targets:
+            mode_output = output / mode_name
+            mode_output.mkdir(parents=True, exist_ok=True)
+            summary_path = mode_output / "strace-summary.txt"
+
+            def traced_command(extra_env=()):
+                return [
+                    "dbus-run-session", "--", "xvfb-run", "-a",
+                    strace, "-f", "-c", "-w",
+                    "-e", "trace=%file,%process",
+                    "-o", str(summary_path), "--",
+                    "env", "LD_DEBUG=statistics", *extra_env,
+                    str(executable), "--smoke-test",
+                ]
+
+            result = subprocess.run(
+                traced_command(),
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=120,
+                check=False,
+            )
+            fallback_used = False
+            if result.returncode != 0 and not direct:
+                fallback_used = True
+                result = subprocess.run(
+                    traced_command(("APPIMAGE_EXTRACT_AND_RUN=1",)),
+                    env=env,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    timeout=120,
+                    check=False,
+                )
+
+            combined = result.stderr + "\n" + result.stdout
+            (mode_output / "loader-statistics.log").write_text(
+                combined, encoding="utf-8"
+            )
+            trace = {
+                name: float(value)
+                for name, value in TRACE_RE.findall(combined)
+            }
+            required = ("GTK imported", "main window mapped")
+            missing = [name for name in required if name not in trace]
+            (mode_output / "profile-exit-status.txt").write_text(
+                f"returncode={result.returncode}\n"
+                f"fallback_used={fallback_used}\n"
+                f"gtk_imported={trace.get('GTK imported', 'missing')}\n"
+                f"main_window_mapped={trace.get('main window mapped', 'missing')}\n",
+                encoding="utf-8",
+            )
+            if result.returncode != 0 or missing:
+                raise SystemExit(
+                    f"{mode_name} profile failed: returncode={result.returncode}; "
+                    f"missing milestones={missing}; output={combined[-6000:]}"
+                )
+
+            syscall_summary = (
+                summary_path.read_text(encoding="utf-8", errors="replace")
+                if summary_path.exists() else "strace did not produce a summary\n"
+            )
+            loader_lines = combined.splitlines()
+            summaries[mode_name] = {
+                "fallback_used": fallback_used,
+                "gtk_import_seconds": trace["GTK imported"],
+                "window_mapped_seconds": trace["main window mapped"],
+                "strace_summary": syscall_summary,
+                "loader_statistics": loader_lines[-100:],
+            }
+
+    for mode_name, summary in summaries.items():
+        print(f"=== {mode_name}: file/process syscall summary ===")
+        print(summary["strace_summary"])
+        print(f"=== {mode_name}: dynamic-loader statistics and startup trace ===")
+        print("\n".join(summary["loader_statistics"]))
+        print(
+            f"{mode_name}: GTK import {summary['gtk_import_seconds']:.3f}s; "
+            f"main window mapped {summary['window_mapped_seconds']:.3f}s; "
+            f"fallback={summary['fallback_used']}"
+        )
+    print(f"Wrote startup profiles to {output}")
 
 def inventory(args):
     image = args.appimage.resolve()

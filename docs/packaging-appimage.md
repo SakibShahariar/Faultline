@@ -114,6 +114,32 @@ cold disk-cache measurement. Compare the milestone timings as well as wall-clock
 time; the benchmark does not clear the operating system's page cache.
 
 
+## Measured AppImage startup (CI, 2026-11-12)
+
+The successful three-trial CI benchmark for Faultline 0.1.2 reached both the
+GTK-import and main-window-mapped milestones in every mode:
+
+| Launch mode | Median wall time | Median GTK import | Median window mapped |
+| --- | ---: | ---: | ---: |
+| Normal AppImage runtime | 5.438 s | 2.769 s | 4.414 s |
+| Direct AppRun on an already-mounted FUSE AppDir | 0.740 s | 0.243 s | 0.533 s |
+| Direct AppRun from an extracted AppDir | 0.438 s | 0.092 s | 0.348 s |
+
+The first mounted-AppDir trial took 5.460 s, then its two warm trials took
+0.737 s and 0.740 s. The normal AppImage runtime remained around 5.4 s across
+all three trials. This indicates that repeatedly starting through the normal
+AppImage runtime is substantially more expensive than launching AppRun from an
+already-mounted or extracted AppDir. The persistent-mount-to-extracted
+difference is only about 0.3 s in these warm CI samples.
+
+The normal-runtime GTK-import milestone was about 2.53 s later than the
+persistent-mount median, and its window-mapped milestone was about 3.88 s
+later. These are measured path differences, not a claim that GTK's own code
+accounts for all of the delay: runtime setup, filesystem access, and dynamic
+library loading all contribute. The benchmark does not clear the kernel page
+cache, and CI timings are not desktop guarantees. The Fedora RPM uses host GTK
+and is not represented by these AppImage measurements.
+
 ## AppImage profiling and dependency inventory
 
 The CI workflow publishes a separate diagnostics artifact alongside the AppImage.
