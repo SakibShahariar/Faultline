@@ -12,7 +12,7 @@ class SamplerTests(unittest.TestCase):
             proc = root / "proc"
             sys = root / "sys"
             (proc / "sys/kernel/random").mkdir(parents=True)
-            (proc / "stat").write_text("cpu 100 0 20 50 10 0 0 0\n")
+            (proc / "stat").write_text("cpu 100 0 20 60 10 0 0 10\n")
             (proc / "meminfo").write_text(
                 "MemTotal: 1024 kB\nMemAvailable: 400 kB\n"
                 "SwapTotal: 512 kB\nSwapFree: 256 kB\n"
@@ -33,7 +33,7 @@ class SamplerTests(unittest.TestCase):
             self.assertEqual(sample["temperature_c"], 45.0)
             self.assertEqual(sample["gpu_busy_percent"], 40.0)
             self.assertEqual(sample["boot_id"], "a" * 32)
-            self.assertEqual(counters, (180, 60))
+            self.assertEqual(counters, (200, 70))
 
     def test_unsupported_metrics_are_not_reported_as_zero(self):
         with tempfile.TemporaryDirectory() as directory:
