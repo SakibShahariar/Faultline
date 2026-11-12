@@ -1,0 +1,9 @@
+[
+  {
+    "COREDUMP_BOOT_ID": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "COREDUMP_EXE": "/usr/bin/demo-app",
+    "COREDUMP_SIGNAL": "11",
+    "COREDUMP_PID": "4242",
+    "COREDUMP_TIMESTAMP": "2026-11-12T09:30:00+00:00"
+  }
+]
