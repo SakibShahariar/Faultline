@@ -20,13 +20,17 @@ assert module.OPEN_INCIDENT_ID == "FL-0001"
 window = app.props.active_window
 assert window is not None, "Faultline did not create its main window"
 assert window.get_title() == "Faultline"
+default_width, default_height = window.get_default_size()
+assert (default_width, default_height) == (960, 680), f"Unexpected initial window size: {default_width}x{default_height}"
 overview = window.pages["overview"]
 assert isinstance(overview, module.Gtk.ScrolledWindow), "Overview is not using the dashboard layout"
 clamp = overview.get_child()
 while clamp is not None and not isinstance(clamp, module.Adw.Clamp):
     clamp = clamp.get_child() if hasattr(clamp, "get_child") else None
 assert isinstance(clamp, module.Adw.Clamp), "Overview is not width-clamped"
-assert clamp.get_maximum_size() == 1320, "Overview width limit changed unexpectedly"
+assert clamp.get_maximum_size() == 1200, "Overview width limit changed unexpectedly"
+assert clamp.get_tightening_threshold() == 840, "Overview clamp threshold changed unexpectedly"
+assert overview.get_policy()[0] == module.Gtk.PolicyType.NEVER, "Overview should not introduce horizontal scrolling"
 icon_theme = module.Gtk.IconTheme.get_for_display(window.get_display())
 for _name, _label, icon_name in window.nav_names:
     assert icon_theme.has_icon(icon_name), f"Missing bundled navigation icon: {icon_name}"
@@ -62,6 +66,8 @@ assert requested_width < 760 and requested_height < 560, (
 assert isinstance(window.get_content(), module.Adw.ToastOverlay)
 split_view = window.get_content().get_child()
 assert isinstance(split_view, module.Adw.NavigationSplitView)
+assert split_view.get_min_sidebar_width() == 176
+assert split_view.get_max_sidebar_width() == 224
 assert split_view.get_sidebar() is not None
 assert split_view.get_content() is not None
 window.show_incident({

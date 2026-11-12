@@ -60,7 +60,7 @@ class FaultlineWindow(Adw.ApplicationWindow):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.set_title("Faultline")
-        self.set_default_size(1120, 760)
+        self.set_default_size(960, 680)
         startup_trace("window construction started")
 
         self.window_title = Adw.WindowTitle(title="Overview", subtitle="System summary")
@@ -161,8 +161,8 @@ class FaultlineWindow(Adw.ApplicationWindow):
         split = Adw.NavigationSplitView()
         split.set_sidebar(Adw.NavigationPage.new(sidebar_toolbar, "Navigation"))
         split.set_content(Adw.NavigationPage.new(content_toolbar, "Faultline"))
-        split.set_min_sidebar_width(210)
-        split.set_max_sidebar_width(260)
+        split.set_min_sidebar_width(176)
+        split.set_max_sidebar_width(224)
         split.set_sidebar_width_fraction(0.22)
         self.toast_overlay = Adw.ToastOverlay()
         self.toast_overlay.set_child(split)
