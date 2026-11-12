@@ -21,7 +21,7 @@ RULES = [
         r"I/O error|blk_update_request|buffer I/O error|nvme.*(timeout|reset|error)", re.I),
      "The kernel or storage stack reported an I/O or device error."),
     ("shell-restart", "GNOME Shell/Mutter restart", re.compile(
-        r"(?:gnome-shell|mutter)(?:\\.service)?[^\\n]*(?:scheduled restart|restarting|restarted)", re.I),
+        r"(?:gnome-shell|mutter).*?(?:scheduled restart|restarting|restarted)", re.I),
      "The desktop session journal records a GNOME Shell or Mutter service restart."),
     ("shell-crash", "GNOME Shell failure", re.compile(
         r"gnome-shell.*(segfault|core dumped|terminated|code=dumped|status=11|signal 11)|"
