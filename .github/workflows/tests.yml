@@ -106,7 +106,7 @@ jobs:
         run: |
           mkdir -p "$HOME/rpmbuild/SOURCES"
           tar --exclude=.git --transform="s,^\\./,Faultline-$APP_VERSION/," \
-            -czf "$HOME/rpmbuild/SOURCES/v$APP_VERSION.tar.gz" .
+            -czf "$HOME/rpmbuild/SOURCES/Faultline-$APP_VERSION.tar.gz" .
       - name: Build Fedora RPM
         run: rpmbuild -ba packaging/rpm/faultline.spec --define "_topdir $HOME/rpmbuild"
       - name: Install and verify packaged entry points and assets
