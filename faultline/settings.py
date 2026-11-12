@@ -17,6 +17,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "sample_interval_seconds": 10,
     "sample_retention_hours": 24,
     "notify_new_incidents": True,
+    "notification_min_severity": "low",
 }
 
 
@@ -43,6 +44,8 @@ def load_settings() -> dict[str, Any]:
     settings["sample_retention_hours"] = _bounded_int(
         settings["sample_retention_hours"], 24, 1, 720
     )
+    if settings["notification_min_severity"] not in {"low", "medium", "high"}:
+        settings["notification_min_severity"] = "low"
     return settings
 
 
