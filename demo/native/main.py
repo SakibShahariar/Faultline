@@ -312,6 +312,7 @@ class FaultlineWindow(Adw.ApplicationWindow):
                     (item["sources"] or item["source"]) + " · " + str(item["boot_count"]) + " boots",
                     item["example"],
                     Gtk.Label(label=str(item["event_count"]) + " events"),
+                    callback=lambda *_args, recurrence=item: self.show_recurrence(recurrence),
                 )
         else:
             self.action_row(group, "No recurring signatures",
@@ -750,6 +751,77 @@ class FaultlineWindow(Adw.ApplicationWindow):
                         icon="go-previous-symbolic",
                         callback=lambda *_: self.show_page("incidents"))
         self.stack.set_visible_child_name("incident-detail")
+
+    def show_recurrence(self, recurrence):
+        page = self.pages.get("recurrence-detail")
+        if page:
+            self.stack.remove(page)
+        page = Adw.PreferencesPage()
+        self.pages["recurrence-detail"] = page
+        self.stack.add_titled(page, "recurrence-detail", "Recurring pattern")
+        self.window_title.set_title("Recurring pattern")
+        self.window_title.set_subtitle(
+            str(recurrence["boot_count"]) + " boots · " +
+            str(recurrence["event_count"]) + " occurrences"
+        )
+
+        group = self.group(
+            page, "Pattern summary",
+            "Occurrences share the same normalized event signature. Similarity does not prove a shared root cause."
+        )
+        self.action_row(group, "Sources", recurrence.get("sources") or recurrence.get("source", "Unknown"))
+        self.action_row(group, "First seen", recurrence.get("first_seen") or "Timestamp unavailable")
+        self.action_row(group, "Last seen", recurrence.get("last_seen") or "Timestamp unavailable")
+        self.action_row(group, "Signature", recurrence["signature"])
+
+        group = self.group(
+            page, "Occurrences",
+            "Each row is one stored event. Open an associated finding when Faultline has one for that record."
+        )
+        if recurrence.get("occurrences_truncated"):
+            self.action_row(
+                group,
+                f"Showing {len(recurrence['occurrences'])} of {recurrence['event_count']} occurrences",
+                "The occurrence list is bounded to keep the interface responsive.",
+            )
+        for occurrence in recurrence.get("occurrences", []):
+            row = Adw.ExpanderRow()
+            row.set_title(
+                (occurrence["timestamp"] or "Timestamp unavailable") +
+                " · " + occurrence["source"]
+            )
+            row.set_subtitle("Boot " + occurrence["boot_id"][:8])
+            message = Gtk.Label(label=occurrence["message"], xalign=0, wrap=True, selectable=True)
+            message.set_margin_top(8)
+            message.set_margin_bottom(8)
+            message.set_margin_start(12)
+            message.set_margin_end(12)
+            row.add_row(message)
+            matching_incident = next((
+                incident for incident in INCIDENTS
+                if incident["boot_id"] == occurrence["boot_id"]
+                and any(
+                    evidence[2].split("\\nCommand:", 1)[0] == occurrence["message"]
+                    for evidence in incident["evidence"]
+                )
+            ), None)
+            if matching_incident:
+                open_button = Gtk.Button(label="Open incident")
+                open_button.add_css_class("flat")
+                open_button.connect(
+                    "clicked",
+                    lambda *_args, item=matching_incident: self.show_incident(item),
+                )
+                row.add_suffix(open_button)
+            group.add(row)
+
+        navigation = self.group(page, "Navigation")
+        self.action_row(
+            navigation, "Back to overview", "Return to the system summary.",
+            icon="go-previous-symbolic",
+            callback=lambda *_: self.show_page("overview"),
+        )
+        self.stack.set_visible_child_name("recurrence-detail")
 
     def scan_dialog(self, *_args):
         dialog = Adw.AlertDialog(
