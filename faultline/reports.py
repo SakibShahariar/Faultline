@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -150,4 +151,8 @@ def write_report(path: str | Path, report: dict, format: str = "markdown") -> Pa
         destination.write_text(render_markdown(report), encoding="utf-8")
     else:
         raise ValueError(f"Unsupported report format: {format}")
+    try:
+        os.chmod(destination, 0o600)
+    except OSError:
+        pass
     return destination
