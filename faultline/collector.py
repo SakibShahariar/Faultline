@@ -32,6 +32,8 @@ def scan(database: Database | None = None) -> dict:
     try:
         try:
             boots = list_boots()
+            # Keep periodic scans bounded; older records remain available in SQLite.
+            boots = boots[-10:]
             db.set_source_status("journal", True, "systemd journal is readable")
         except SourceError as exc:
             db.set_source_status("journal", False, str(exc))
