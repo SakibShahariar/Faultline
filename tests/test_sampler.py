@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 
 from faultline.sampler import collect_sample
+from faultline.storage import Database
 
 
 class SamplerTests(unittest.TestCase):
@@ -34,6 +35,29 @@ class SamplerTests(unittest.TestCase):
             self.assertEqual(sample["gpu_busy_percent"], 40.0)
             self.assertEqual(sample["boot_id"], "a" * 32)
             self.assertEqual(counters, (200, 70))
+
+    def test_samples_are_stored_and_retained(self):
+        with tempfile.TemporaryDirectory() as directory:
+            db = Database(Path(directory) / "faultline.db")
+            sample = {
+                "boot_id": "c" * 32,
+                "captured_at": "2026-11-12T06:00:00+00:00",
+                "cpu_percent": 20.0,
+                "memory_used_bytes": 1024,
+                "memory_total_bytes": 2048,
+                "swap_used_bytes": None,
+                "swap_total_bytes": None,
+                "temperature_c": None,
+                "gpu_busy_percent": None,
+                "metadata": {"gpu_devices_sampled": 0},
+            }
+            db.add_sample(sample)
+            rows = db.latest_samples(1)
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["cpu_percent"], 20.0)
+            self.assertIsNone(rows[0]["gpu_busy_percent"])
+            self.assertEqual(db.connection.execute("PRAGMA user_version").fetchone()[0], 2)
+            db.close()
 
     def test_unsupported_metrics_are_not_reported_as_zero(self):
         with tempfile.TemporaryDirectory() as directory:
