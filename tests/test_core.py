@@ -40,12 +40,13 @@ class JournalParserTests(unittest.TestCase):
         self.assertEqual(boots[0].last_seen, "Mon 2026-11-10 09:00:00")
 
     def test_parses_journal_json(self):
-        row = {"MESSAGE": "Out of memory: Killed process 42", "__REALTIME_TIMESTAMP": "1000000",
-               "SYSLOG_IDENTIFIER": "kernel", "PRIORITY": "3", "_SYSTEMD_UNIT": "systemd-oomd.service"}
-        events = parse_journal_json([json.dumps(row)], "a" * 32)
+        fixture = Path(__file__).parent / "fixtures" / "journal" / "oom.json"
+        row = json.loads(fixture.read_text(encoding="utf-8"))
+        events = parse_journal_json([json.dumps(row)], row["_BOOT_ID"])
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0].priority, 3)
         self.assertEqual(events[0].source, "kernel")
+        self.assertIn("Killed process", events[0].message)
 
     def test_skips_malformed_and_empty_rows(self):
         events = parse_journal_json(["not json", json.dumps({"MESSAGE": ""})], "b" * 32)
