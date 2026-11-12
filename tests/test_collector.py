@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from faultline.collector import scan
 from faultline.models import Boot, Event
+from faultline.presentation import load_boot_summary, load_incidents, load_source_status
 from faultline.sources import SourceError
 from faultline.storage import Database
 
@@ -47,6 +48,22 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(stored["id"], first_finding_id)
         self.assertEqual(self.db.connection.execute("SELECT COUNT(*) FROM events").fetchone()[0], 1)
         self.assertEqual(self.db.connection.execute("SELECT COUNT(*) FROM findings").fetchone()[0], 1)
+
+    def test_collected_incident_flows_through_database_to_ui_view_model(self):
+        event = Event(
+            self.boot.boot_id, "2026-11-12T09:30:00+00:00",
+            "kernel", "Out of memory: Killed process 123",
+        )
+        self.scan_with(lambda _boot_id: iter([event]))
+
+        incidents = load_incidents(self.db)
+        self.assertEqual(len(incidents), 1)
+        self.assertEqual(incidents[0]["id"], "FL-0001")
+        self.assertEqual(incidents[0]["category"], "oom")
+        self.assertEqual(incidents[0]["severity"], "Medium")
+        self.assertTrue(any("Killed process" in item[2] for item in incidents[0]["evidence"]))
+        self.assertEqual(load_boot_summary(self.db)["count"], 1)
+        self.assertIn("journal", load_source_status(self.db))
 
     def test_journal_failure_preserves_existing_findings(self):
         event = Event(self.boot.boot_id, "2026-01-01T00:00:00+00:00",
