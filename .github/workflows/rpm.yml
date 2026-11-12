@@ -45,6 +45,7 @@ jobs:
       - name: Prepare RPM source archive
         shell: bash
         run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           mkdir -p "$RUNNER_TEMP/rpmbuild"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
           git archive --format=tar --prefix="Faultline-$APP_VERSION/" HEAD | gzip -n > "$RUNNER_TEMP/rpmbuild/SOURCES/Faultline-$APP_VERSION.tar.gz"
           cp packaging/rpm/faultline.spec "$RUNNER_TEMP/rpmbuild/SPECS/faultline.spec"
