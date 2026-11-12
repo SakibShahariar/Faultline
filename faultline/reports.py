@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import socket
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -14,6 +15,9 @@ _EMAIL = re.compile(r"(?<![\w.+-])[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}")
 _IPV4 = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 _MAC = re.compile(r"\b(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\b")
 _BEARER = re.compile(r"(?i)\b(bearer\s+)[A-Za-z0-9._~+/-]+=*")
+_SECRET_ARGUMENT = re.compile(
+    r"(?i)(--?(?:token|password|passwd|secret|api[-_]key)(?:=|\s+))([^\s]+)"
+)
 
 
 def redact_text(value: str) -> str:
@@ -21,7 +25,15 @@ def redact_text(value: str) -> str:
     value = _EMAIL.sub("<redacted-email>", value)
     value = _IPV4.sub("<redacted-ip>", value)
     value = _MAC.sub("<redacted-mac>", value)
-    return _BEARER.sub(r"\1<redacted-token>", value)
+    value = _BEARER.sub(r"\1<redacted-token>", value)
+    value = _SECRET_ARGUMENT.sub(r"\1<redacted>", value)
+    hostname = socket.gethostname().strip()
+    if hostname and hostname not in {"localhost", "localhost.localdomain"}:
+        value = re.sub(
+            rf"(?<![\\w.-]){re.escape(hostname)}(?![\\w.-])",
+            "<redacted-host>", value, flags=re.IGNORECASE,
+        )
+    return value
 
 
 def build_report(db: Database, boot_id: str | None = None, redact: bool = True) -> dict:
