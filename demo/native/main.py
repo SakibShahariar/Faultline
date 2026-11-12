@@ -803,7 +803,8 @@ class FaultlineWindow(Adw.ApplicationWindow):
     def _set_scan_running(self, running):
         self.scan_button.set_sensitive(not running)
         self.scan_label.set_text("Scanning…" if running else "Scan")
-        self.scan_spinner.set_visible(running)        if running:
+        self.scan_spinner.set_visible(running)
+        if running:
             self.scan_spinner.start()
         else:
             self.scan_spinner.stop()
