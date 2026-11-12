@@ -1,68 +1,63 @@
 # Fedora packaging
 
-Faultline is distributed under the MIT License. The repository's `LICENSE`
-file contains the full terms, and the RPM spec declares the matching SPDX
-identifier `MIT`.
+Faultline is distributed under the MIT License. The RPM installs the Python
+command-line tools, native GTK4/libadwaita application, desktop entry,
+AppStream metadata, icons, and optional systemd **user** units. It does not
+enable background collection automatically.
 
-The RPM installs the Python command-line
-tools, native GTK launcher, desktop entry, AppStream metadata, icon, and optional
-systemd **user** units. It does not enable background collection automatically.
+The Fedora 44 CI job builds the RPM from the checked-out source, installs it,
+checks the command-line and GUI entry points, verifies packaged assets, and
+removes the package while confirming that user data is preserved. Tagged
+GitHub releases include the Fedora 44 RPM and its SHA-256 checksum alongside
+the AppImage.
 
 ## Build locally on Fedora
 
-Install the RPM build tooling and GTK runtime dependencies:
+Install the RPM build tooling and application dependencies:
 
 ```sh
 sudo dnf install rpm-build rpmdevtools redhat-rpm-config pyproject-rpm-macros \
-  python3-devel python3-pip python3-setuptools python3-gobject gtk4 libadwaita systemd-rpm-macros
+  python3-devel python3-pip python3-setuptools python3-gobject \
+  gtk4 libadwaita systemd-rpm-macros
 ```
 
-Prepare the standard RPM build tree, then build from a tagged source archive:
+Build the package from the current checkout using the same source archive
+layout as CI:
 
 ```sh
-rpmdev-setuptree
-spectool -g -R packaging/rpm/faultline.spec
-rpmbuild -ba packaging/rpm/faultline.spec
-```
-
-The spec downloads the GitHub archive for the `v0.1.0` tag. The resulting RPM
-is written to `~/rpmbuild/RPMS/noarch/`.
-
-To build the current working tree before creating a release, use the exact
-source archive filename and top-level directory expected by the spec:
-
-```sh
+version="$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
 mkdir -p "$HOME/rpmbuild/SOURCES"
-tar --exclude=.git \
-  --transform='s,^\./,Faultline-0.1.0/,' \
-  -czf "$HOME/rpmbuild/SOURCES/v0.1.0.tar.gz" .
-rpmbuild -ba packaging/rpm/faultline.spec
+tar --exclude=.git --transform="s,^\\./,Faultline-$version/," \
+  -czf "$HOME/rpmbuild/SOURCES/v$version.tar.gz" .
+rpmbuild -ba packaging/rpm/faultline.spec --define "_topdir $HOME/rpmbuild"
 ```
 
-Run the build command from the repository checkout. This is the same archive
-layout used by the Fedora CI build. The tagged-source workflow above remains
-the recommended path for a release build.
+The resulting noarch RPM is written under
+`~/rpmbuild/RPMS/noarch/`. For a published version, build from its matching
+`v<version>` tag; the spec's `Source0` points to that tagged source archive.
 
-## Install and enable optional collection
+## Install
 
-Install the package:
+Install the RPM with DNF:
 
 ```sh
-sudo dnf install ./faultline-0.1.0-1*.noarch.rpm
+sudo dnf install "$HOME"/rpmbuild/RPMS/noarch/faultline-*.rpm
 ```
 
-Launch Faultline from the application grid or run `faultline-gui`. A manual scan
-is available with `faultline scan`.
+Launch Faultline from the application grid or run `faultline-gui`. The
+command-line interface is available as `faultline`.
 
-Background collection remains opt-in. To enable the timer for the current user:
+Background collection remains opt-in. To enable the collector timer for the
+current user:
 
 ```sh
 systemctl --user daemon-reload
 systemctl --user enable --now faultline-collector.timer
 ```
 
-The resource sampler is separately controlled in Preferences and remains disabled
-by default. Do not enable its service unless sampling is enabled in Faultline.
+The resource sampler is separately controlled in Preferences and remains
+disabled by default. Do not enable its service unless sampling is enabled in
+Faultline.
 
 ## Remove
 
@@ -72,12 +67,13 @@ sudo dnf remove faultline
 ```
 
 Removing the RPM does not delete the user's local database or preferences. To
-remove personal data, use the application's **Clear History** action and remove
-`~/.local/share/faultline` and `~/.config/faultline` separately if desired.
+remove personal data, use the application's **Clear History** action and
+remove `~/.local/share/faultline` and `~/.config/faultline` separately if
+desired.
 
 ## Support boundary
 
-The initial package targets Fedora releases that provide Python 3, GTK 4,
-libadwaita, and systemd user services. The collector itself is designed around
-systemd and Linux diagnostic interfaces; other distributions may package the
-same runtime and unit files using their native packaging tools.
+The release RPM is built and validated in Fedora 44 CI. The package uses the
+distribution's Python, GTK4, libadwaita, and systemd runtime rather than
+bundling them. Other Fedora versions may work when they provide the required
+dependencies, but are not separately validated by this workflow.
