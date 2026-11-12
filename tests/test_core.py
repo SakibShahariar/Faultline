@@ -6,7 +6,7 @@ from pathlib import Path
 from faultline.diagnostics import classify
 from faultline.models import Boot, Event
 from faultline.signatures import normalize_message, signature_for
-from faultline.sources import parse_journal_json
+from faultline.sources import parse_boot_list, parse_journal_json
 from faultline.storage import Database
 
 
@@ -20,6 +20,17 @@ class SignatureTests(unittest.TestCase):
 
 
 class JournalParserTests(unittest.TestCase):
+    def test_parses_boot_history(self):
+        lines = [
+            "IDX BOOT ID FIRST ENTRY LAST ENTRY",
+            "-1 " + "a" * 32 + " Mon 2026-11-10 08:00:00 Mon 2026-11-10 09:00:00",
+            "0 " + "b" * 32 + " Tue 2026-11-11 08:00:00 Tue 2026-11-11 10:00:00",
+        ]
+        boots = parse_boot_list(lines)
+        self.assertEqual(len(boots), 2)
+        self.assertFalse(boots[0].current)
+        self.assertTrue(boots[1].current)
+
     def test_parses_journal_json(self):
         row = {"MESSAGE": "Out of memory: Killed process 42", "__REALTIME_TIMESTAMP": "1000000",
                "SYSLOG_IDENTIFIER": "kernel", "PRIORITY": "3", "_SYSTEMD_UNIT": "systemd-oomd.service"}
