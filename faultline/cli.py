@@ -5,6 +5,7 @@ import argparse
 import json
 
 from .collector import scan
+from .recurrence import find_recurring_events
 from .reports import build_report, write_report
 from .storage import Database
 
@@ -16,6 +17,7 @@ def main() -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("scan", help="collect available boot journal evidence")
     sub.add_parser("boots", help="list stored boot records")
+    sub.add_parser("recurrences", help="list event signatures seen across multiple boots")
     report_parser = sub.add_parser("report", help="export a local diagnostic report")
     report_parser.add_argument("--output", required=True, help="destination file")
     report_parser.add_argument("--format", choices=("markdown", "json"),
@@ -33,6 +35,10 @@ def main() -> int:
 
     db = Database()
     try:
+        if args.command == "recurrences":
+            print(json.dumps(find_recurring_events(db), indent=2))
+            return 0
+
         if args.command == "report":
             report = build_report(
                 db, boot_id=args.boot_id, redact=not args.include_sensitive
