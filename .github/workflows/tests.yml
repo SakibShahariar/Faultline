@@ -25,6 +25,12 @@ jobs:
       - name: Install GTK and libadwaita runtime
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 xvfb dbus-x11
+          sudo apt-get install -y python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 xvfb dbus-x11 appstream desktop-file-utils libxml2-utils
+      - name: Validate desktop integration assets
+        run: |
+          desktop-file-validate data/applications/io.github.sakibshahariar.Faultline.desktop
+          appstreamcli validate data/metainfo/io.github.sakibshahariar.Faultline.metainfo.xml
+          xmllint --noout data/icons/hicolor/scalable/apps/io.github.sakibshahariar.Faultline.svg
+          systemd-analyze verify data/systemd/user/faultline-collector.service data/systemd/user/faultline-collector.timer data/systemd/user/faultline-sampler.service
       - name: Launch native application under a virtual display
-        run: dbus-run-session -- xvfb-run -a /usr/bin/python3 tests/native_smoke.py
+        run: GTK_A11Y=none dbus-run-session -- xvfb-run -a /usr/bin/python3 tests/native_smoke.py
