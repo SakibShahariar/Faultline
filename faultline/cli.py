@@ -16,7 +16,11 @@ def main() -> int:
         prog="faultline", description="Local Linux crash diagnostics"
     )
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("scan", help="collect available boot journal evidence")
+    scan_parser = sub.add_parser("scan", help="collect available boot journal evidence")
+    scan_parser.add_argument(
+        "--notify", action="store_true",
+        help="send desktop notifications for newly discovered incidents",
+    )
     sub.add_parser("boots", help="list stored boot records")
     sub.add_parser("recurrences", help="list event signatures seen across multiple boots")
     sub.add_parser("sampler", help="run the optional background resource sampler")
@@ -32,7 +36,7 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.command == "scan":
-        print(json.dumps(scan(), indent=2))
+        print(json.dumps(scan(notify=args.notify), indent=2))
         return 0
     if args.command == "sampler":
         try:
