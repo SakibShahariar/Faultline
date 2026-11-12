@@ -20,6 +20,7 @@ from pathlib import Path
 
 
 TRACE_RE = re.compile(r"\[Faultline startup\] (.*?): ([0-9.]+)s")
+LIBRARY_PATH_CACHE: dict[str, str] = {}
 
 
 def run_command(command: list[str], *, env: dict[str, str], timeout: int = 90):
@@ -58,9 +59,32 @@ def launch_command(target: Path, *, appimage: Path, direct_apprun: bool):
         "OWD": os.getcwd(),
     })
     if direct_apprun:
-        env["APPDIR"] = str(target)
+        appdir = target
+        env.update({
+            "APPDIR": str(appdir),
+            "PYTHONHOME": str(appdir / "usr"),
+            "PYTHONPATH": str(appdir / "usr" / "share" / "faultline"),
+            "PYTHONNOUSERSITE": "1",
+            "GI_TYPELIB_PATH": str(appdir / "usr" / "lib" / "x86_64-linux-gnu" / "girepository-1.0"),
+            "GSETTINGS_SCHEMA_DIR": str(appdir / "usr" / "share" / "glib-2.0" / "schemas"),
+            "XDG_DATA_DIRS": str(appdir / "usr" / "share") + ":" + env.get("XDG_DATA_DIRS", "/usr/local/share:/usr/share"),
+            "XDG_CONFIG_DIRS": str(appdir / "etc" / "xdg") + ":" + env.get("XDG_CONFIG_DIRS", "/etc/xdg"),
+            "PATH": str(appdir / "usr" / "bin") + ":" + env.get("PATH", "/usr/bin:/bin"),
+        })
+        appdir_key = str(appdir)
+        if appdir_key not in LIBRARY_PATH_CACHE:
+            LIBRARY_PATH_CACHE[appdir_key] = ":".join(sorted({
+                str(path.parent)
+                for path in appdir.rglob("*.so*")
+                if path.is_file()
+            }))
+        library_path = LIBRARY_PATH_CACHE[appdir_key]
+        existing_library_path = env.get("LD_LIBRARY_PATH")
+        if existing_library_path:
+            library_path += ":" + existing_library_path
+        env["LD_LIBRARY_PATH"] = library_path
         env.pop("APPIMAGE_EXTRACT_AND_RUN", None)
-        executable = target / "AppRun"
+        executable = appdir / "usr" / "bin" / "faultline-app"
         command = [
             "dbus-run-session", "--", "xvfb-run", "-a",
             str(executable), "--smoke-test",
@@ -166,14 +190,15 @@ def benchmark(args):
         try:
             modes = [
                 ("appimage_runtime", image, False),
-                ("extracted_apprun", extracted, True),
+                ("extracted_appdir_launcher", extracted, True),
             ]
             if mounted is not None:
-                modes.insert(1, ("mounted_apprun", mounted, True))
+                modes.insert(1, ("mounted_appdir_launcher", mounted, True))
 
-            for mode_name, target, direct in modes:
-                samples = []
-                for index in range(args.runs):
+            samples_by_mode = {name: [] for name, _target, _direct in modes}
+            for index in range(args.runs):
+                ordered_modes = modes if index % 2 == 0 else list(reversed(modes))
+                for mode_name, target, direct in ordered_modes:
                     command, env = launch_command(
                         target, appimage=image, direct_apprun=direct
                     )
@@ -185,11 +210,19 @@ def benchmark(args):
                         sample = run_command(command, env=env)
                         sample["fallback"] = "APPIMAGE_EXTRACT_AND_RUN=1"
                         sample["trial"] = index + 1
-                    samples.append(sample)
+                    samples_by_mode[mode_name].append(sample)
                     if sample["returncode"] != 0:
                         raise RuntimeError(
                             f"{mode_name} trial {index + 1} failed: {sample['stderr'][-2000:]}"
                         )
+                    if "main window mapped" not in sample["milestones_seconds"]:
+                        raise RuntimeError(
+                            f"{mode_name} trial {index + 1} exited without reaching "
+                            f"the main-window-mapped milestone; this is not a valid "
+                            f"GUI startup sample. stderr: {sample['stderr'][-3000:]}"
+                        )
+
+            for mode_name, samples in samples_by_mode.items():
                 report["modes"][mode_name] = {
                     "samples": samples,
                     "wall_seconds": [sample["wall_seconds"] for sample in samples],
