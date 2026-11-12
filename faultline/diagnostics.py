@@ -40,18 +40,53 @@ RULES = [
 ]
 
 
+COUNTER_RULES = {
+    "oom": re.compile(
+        r"\\bno\\s+(?:recorded\\s+)?(?:out[- ]of[- ]memory|oom(?:-kill| killer)?)\\b|"
+        r"\\b(?:oom|out[- ]of[- ]memory)\\s+(?:was\\s+)?not\\s+detected\\b", re.I),
+    "kernel-panic": re.compile(
+        r"\\bno\\s+(?:kernel\\s+)?(?:panic|oops)\\b|\\bkernel\\s+panic\\s+not\\s+detected\\b", re.I),
+    "gpu-reset": re.compile(
+        r"\\bno\\s+(?:gpu\\s+)?(?:reset|hang)\\b|\\bgpu\\s+(?:reset|hang)\\s+not\\s+detected\\b", re.I),
+    "storage-error": re.compile(
+        r"\\bno\\s+(?:storage|disk|i/o)\\s+errors?\\b|\\bno\\s+nvme\\s+errors?\\b", re.I),
+    "shell-crash": re.compile(
+        r"\\bno\\s+gnome-shell\\s+crash\\b|\\bgnome-shell\\s+did\\s+not\\s+crash\\b", re.I),
+    "application-crash": re.compile(
+        r"\\bno\\s+application\\s+crash\\b|\\bno\\s+segfaults?\\b", re.I),
+    "coredump-crash": re.compile(
+        r"\\bno\\s+(?:application\\s+)?coredumps?\\s+(?:were\\s+)?recorded\\b", re.I),
+}
+
+
+
+
 def classify(events: list[Event]) -> list[Finding]:
     grouped: dict[str, dict[tuple[str, str], str]] = defaultdict(dict)
+    counter: dict[str, dict[tuple[str, str], str]] = defaultdict(dict)
     for event in events:
+        identity = event.signature or event.message.lower()
+        for category, pattern in COUNTER_RULES.items():
+            if pattern.search(event.message):
+                counter[category][(identity, event.timestamp)] = event.message[:500]
         for category, _title, pattern, _summary in RULES:
             if pattern.search(event.message):
-                identity = event.signature or event.message.lower()
+                if COUNTER_RULES.get(category) and COUNTER_RULES[category].search(event.message):
+                    continue
                 grouped[category][(identity, event.timestamp)] = event.message[:500]
+
     findings: list[Finding] = []
     for category, title, _pattern, summary in RULES:
         records = grouped.get(category, {})
+        contradictory = list(counter.get(category, {}).values())
         evidence = list(records.values())
         if records:
-            confidence = "high" if len(records) >= 2 else "moderate"
-            findings.append(Finding(category, title, summary, confidence, evidence[:20]))
+            confidence = (
+                "low" if contradictory else
+                ("high" if len(records) >= 2 else "moderate")
+            )
+            findings.append(Finding(
+                category, title, summary, confidence,
+                evidence[:20], contradictory[:20],
+            ))
     return findings
