@@ -7,9 +7,10 @@ enable background collection automatically.
 
 The Fedora 45 CI job builds the RPM from the checked-out source, installs it,
 checks the command-line and GUI entry points, verifies packaged assets, and
-removes the package while confirming that user data is preserved. Tagged
-GitHub releases include the Fedora 45 RPM and its SHA-256 checksum alongside
-the AppImage.
+removes the package while confirming that user data is preserved. For a new
+version tag matching the project metadata, the release workflow attaches the
+Fedora 45 RPM and its SHA-256 checksum alongside the AppImage. The published
+v0.1.1 release predates this version-aligned RPM path and remains AppImage-only.
 
 ## Build locally on Fedora
 
