@@ -57,6 +57,32 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(before, after)
         self.assertTrue(result["source_errors"])
 
+    def test_optional_source_failure_preserves_its_findings(self):
+        from faultline.models import Finding
+
+        self.db.upsert_boot(self.boot)
+        self.db.add_findings(self.boot.boot_id, [
+            Finding("coredump-crash", "Application coredump", "Previously recorded",
+                    "moderate", ["coredump evidence"]),
+        ])
+
+        with (
+            patch("faultline.collector.list_boots", return_value=[self.boot]),
+            patch("faultline.collector.list_coredump_events",
+                  side_effect=SourceError("coredumpctl unavailable")),
+            patch("faultline.collector.list_enabled_extensions", return_value=set()),
+            patch("faultline.collector.iter_boot_events", return_value=iter([])),
+            patch("faultline.collector.read_pstore", return_value=[]),
+        ):
+            scan(self.db)
+
+        row = self.db.connection.execute(
+            "SELECT summary FROM findings WHERE boot_id = ? AND category = 'coredump-crash'",
+            (self.boot.boot_id,),
+        ).fetchone()
+        self.assertIsNotNone(row)
+        self.assertEqual(row["summary"], "Previously recorded")
+
 
 if __name__ == "__main__":
     unittest.main()
