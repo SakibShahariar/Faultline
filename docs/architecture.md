@@ -17,7 +17,7 @@ require administrator privileges.
   adapters. Every adapter reports missing tools or access failures explicitly.
 - **Core** — stable event signatures, deduplication, rule-based classification,
   shutdown assessment, and extension error correlation.
-- **Storage** — versioned SQLite database (schema version 3) at
+- **Storage** — versioned SQLite database (schema version 4) at
   `$XDG_DATA_HOME/faultline/crashes.db` (default
   `~/.local/share/faultline/crashes.db`). Database directories use mode 0700 and
   the database file mode 0600 where supported.
