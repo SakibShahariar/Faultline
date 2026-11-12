@@ -9,8 +9,9 @@ from pathlib import Path
 from typing import Iterable
 
 from .models import Boot, Event, Finding
+from .signatures import signature_for
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def default_database_path() -> Path:
@@ -105,6 +106,17 @@ class Database:
                     CREATE INDEX samples_boot_time ON samples(boot_id, captured_at);
                     PRAGMA user_version = 2;
                 """)
+        if version < 3:
+            rows = self.connection.execute(
+                "SELECT id, source, message FROM events"
+            ).fetchall()
+            with self.connection:
+                self.connection.executemany(
+                    "UPDATE events SET signature = ? WHERE id = ?",
+                    [(signature_for(row["message"], row["source"]), row["id"])
+                     for row in rows],
+                )
+                self.connection.execute("PRAGMA user_version = 3")
 
     def upsert_boot(self, boot: Boot) -> None:
         with self.connection:
