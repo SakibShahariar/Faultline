@@ -11,6 +11,7 @@ dependencies = []
 
 [project.scripts]
 faultline = "faultline.cli:main"
+faultline-gui = "faultline.gui:main"
 
 [tool.setuptools]
 packages = ["faultline"]
