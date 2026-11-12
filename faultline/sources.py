@@ -44,9 +44,13 @@ def parse_boot_list(lines: Iterable[str]) -> list[Boot]:
         boot_id = parts[1]
         if len(boot_id) != 32:
             continue
-        boots.append(Boot(boot_id=boot_id, first_seen=" ".join(parts[2:-2]) or None,
-                          last_seen=" ".join(parts[-2:]) or None,
-                          index=index, current=index == 0))
+        boots.append(Boot(
+            boot_id=boot_id,
+            first_seen=" ".join(parts[2:5]) or None,
+            last_seen=" ".join(parts[5:8]) or None,
+            index=index,
+            current=index == 0,
+        ))
     return boots
 
 
