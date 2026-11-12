@@ -46,6 +46,8 @@ COUNTER_RULES = {
         r"\b(?:oom|out[- ]of[- ]memory)\s+(?:was\s+)?not\s+detected\b", re.I),
     "kernel-panic": re.compile(
         r"\bno\s+(?:kernel\s+)?(?:panic|oops)\b|\bkernel\s+panic\s+not\s+detected\b", re.I),
+    "pstore-crash": re.compile(
+        r"\bno\s+(?:retained\s+)?(?:kernel\s+)?(?:panic|oops|watchdog|soft lockup|hard lockup)\b", re.I),
     "gpu-reset": re.compile(
         r"\bno\s+(?:gpu\s+)?(?:reset|hang)\b|\bgpu\s+(?:reset|hang)\s+not\s+detected\b", re.I),
     "storage-error": re.compile(
