@@ -7,6 +7,7 @@ import json
 from .collector import scan
 from .recurrence import find_recurring_events
 from .reports import build_report, write_report
+from .sampler import run_sampler
 from .storage import Database
 
 
@@ -18,6 +19,7 @@ def main() -> int:
     sub.add_parser("scan", help="collect available boot journal evidence")
     sub.add_parser("boots", help="list stored boot records")
     sub.add_parser("recurrences", help="list event signatures seen across multiple boots")
+    sub.add_parser("sampler", help="run the optional background resource sampler")
     report_parser = sub.add_parser("report", help="export a local diagnostic report")
     report_parser.add_argument("--output", required=True, help="destination file")
     report_parser.add_argument("--format", choices=("markdown", "json"),
@@ -31,6 +33,12 @@ def main() -> int:
 
     if args.command == "scan":
         print(json.dumps(scan(), indent=2))
+        return 0
+    if args.command == "sampler":
+        try:
+            run_sampler()
+        except RuntimeError as exc:
+            parser.error(str(exc))
         return 0
 
     db = Database()
