@@ -1,23 +1,35 @@
-# Native GTK4/libadwaita UI prototype
+# Native GTK4/libadwaita application
 
-This is the native interface reference for Faultline. Unlike `demo/index.html`, it uses actual GTK4 and libadwaita widgets.
+This is Faultline's native desktop interface. It uses actual GTK4 and libadwaita
+widgets and reads diagnostic findings from the local SQLite database.
 
 ## Fedora
 
 Install the runtime dependencies:
 
 ```sh
-sudo dnf install gtk4 libadwaita python3-gobject
+sudo dnf install gtk4 libadwaita python3-gobject python3-pip systemd
 ```
 
-Run from the repository root:
+From the repository root, install the diagnostic core and launch the application:
 
 ```sh
+python3 -m pip install --user -e .
 python3 demo/native/main.py
 ```
 
-The prototype includes the main navigation and the Overview, Incidents, Incident Details, System Health, Extensions, Reports, and Preferences pages. It uses `AdwHeaderBar`, `AdwNavigationSplitView`, `AdwNavigationPage`, `AdwPreferencesPage`, `AdwPreferencesGroup`, `AdwActionRow`, `AdwSwitchRow`, `AdwAlertDialog`, and `AdwToastOverlay`.
+The **Scan** action reads the boot journals and coredump metadata available to the
+current user. It runs collection away from the GTK main thread, stores records in
+the local database, and refreshes the Overview and Incidents pages when finished.
+The app does not invoke sudo or request elevated permissions.
 
-All records are fictional. Scanning, report export, and system collection are not implemented; the dialogs explain those boundaries rather than pretending to inspect the host.
+The database is stored at
+`~/.local/share/faultline/crashes.db` (or under `$XDG_DATA_HOME`).
 
-The Python prototype is intended to run inside a GNOME/GTK desktop session. It requires a libadwaita version that provides `AdwNavigationSplitView` and `AdwAlertDialog`.
+The native application currently displays database-backed findings and their linked
+evidence. Resource sampling, extension correlation, report export, notifications,
+and persistent settings are still under development; those screens must not be read
+as proof that those features are already active.
+
+The application requires a GNOME/GTK desktop session and a libadwaita version that
+provides `AdwNavigationSplitView` and `AdwAlertDialog`.
