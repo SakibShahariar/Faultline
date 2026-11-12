@@ -4,6 +4,7 @@ from __future__ import annotations
 from .coredumps import list_coredump_events
 from .diagnostics import classify
 from .models import Event, Finding
+from .pstore import read_pstore
 from .shutdown import assess_shutdown
 from .sources import SourceError, iter_boot_events, list_boots
 from .storage import Database
@@ -48,6 +49,19 @@ def scan(database: Database | None = None) -> dict:
             db.set_source_status("coredumpctl", False, str(exc))
             summary["source_errors"].append({"source": "coredumpctl", "error": str(exc)})
 
+        previous_boot = next((boot for boot in boots if boot.index == -1), None)
+        pstore_by_boot: dict[str, list[Event]] = {}
+        if previous_boot:
+            pstore_events = read_pstore(previous_boot.boot_id)
+            pstore_by_boot[previous_boot.boot_id] = pstore_events
+            db.set_source_status(
+                "pstore", bool(pstore_events),
+                f"{len(pstore_events)} retained record(s); associated with previous boot heuristically"
+                if pstore_events else "No readable retained pstore records found"
+            )
+        else:
+            db.set_source_status("pstore", False, "No previous boot is available for heuristic association")
+
         for boot in boots:
             db.upsert_boot(boot)
             findings_by_category: dict[str, Finding] = {}
@@ -87,6 +101,11 @@ def scan(database: Database | None = None) -> dict:
             if coredump_events:
                 summary["events_added"] += db.add_events(coredump_events)
                 _merge_findings(findings_by_category, coredump_events)
+
+            pstore_events = pstore_by_boot.get(boot.boot_id, [])
+            if pstore_events:
+                summary["events_added"] += db.add_events(pstore_events)
+                _merge_findings(findings_by_category, pstore_events)
 
             boot.shutdown_status = assess_shutdown(shutdown_evidence, current=boot.current)
             db.upsert_boot(boot)
