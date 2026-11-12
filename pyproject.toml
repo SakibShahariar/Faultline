@@ -15,3 +15,14 @@ faultline-gui = "faultline.gui:main"
 
 [tool.setuptools]
 packages = ["faultline"]
+
+[tool.setuptools.data-files]
+"share/faultline/demo/native" = ["demo/native/main.py"]
+"share/applications" = ["data/applications/io.github.sakibshahariar.Faultline.desktop"]
+"share/metainfo" = ["data/metainfo/io.github.sakibshahariar.Faultline.metainfo.xml"]
+"share/icons/hicolor/scalable/apps" = ["data/icons/hicolor/scalable/apps/io.github.sakibshahariar.Faultline.svg"]
+"lib/systemd/user" = [
+  "data/systemd/user/faultline-collector.service",
+  "data/systemd/user/faultline-collector.timer",
+  "data/systemd/user/faultline-sampler.service",
+]
