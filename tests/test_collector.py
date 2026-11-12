@@ -76,6 +76,38 @@ class CollectorTests(unittest.TestCase):
         self.assertFalse(status["available"])
         self.assertIn("not readable", status["detail"])
 
+    def test_extension_errors_are_correlated_with_nearby_shell_crashes(self):
+        extension = "sample-extension@tests"
+        extension_event = Event(
+            self.boot.boot_id, "2026-11-12T09:30:00+00:00", "gnome-shell",
+            "JS ERROR: TypeError at /extensions/sample-extension@tests/extension.js",
+        )
+        shell_event = Event(
+            self.boot.boot_id, "2026-11-12T09:31:00+00:00", "systemd",
+            "gnome-shell.service: Main process exited, code=dumped, status=11/SEGV",
+        )
+        with (
+            patch("faultline.collector.list_boots", return_value=[self.boot]),
+            patch("faultline.collector.list_coredump_events", return_value=[]),
+            patch("faultline.collector.list_enabled_extensions", return_value={extension}),
+            patch("faultline.collector.iter_boot_events",
+                  return_value=iter([extension_event, shell_event])),
+            patch("faultline.collector.read_pstore", return_value=[]),
+        ):
+            scan(self.db)
+
+        finding = self.db.connection.execute(
+            "SELECT title, summary FROM findings WHERE category = 'extension-error'"
+        ).fetchone()
+        self.assertIsNotNone(finding)
+        self.assertIn(extension, finding["title"])
+        self.assertIn("does not prove", finding["summary"])
+        event = self.db.connection.execute(
+            "SELECT event_type, metadata_json FROM events WHERE source = 'gnome-shell'"
+        ).fetchone()
+        self.assertEqual(event["event_type"], "extension-error")
+        self.assertIn(extension, event["metadata_json"])
+
     def test_optional_source_failure_preserves_its_findings(self):
         from faultline.models import Finding
 
