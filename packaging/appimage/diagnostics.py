@@ -58,39 +58,14 @@ def launch_command(target: Path, *, appimage: Path, direct_apprun: bool):
         "FAULTLINE_STARTUP_TRACE": "1",
     })
     if direct_apprun:
-        appdir = target
-        env.update({
-            "APPDIR": str(appdir),
-            "APPIMAGE": str(appimage),
-            "ARGV0": str(appimage),
-            "OWD": os.getcwd(),
-            "PYTHONHOME": str(appdir / "usr"),
-            "PYTHONPATH": str(appdir / "usr" / "share" / "faultline"),
-            "PYTHONNOUSERSITE": "1",
-            "GI_TYPELIB_PATH": str(appdir / "usr" / "lib" / "x86_64-linux-gnu" / "girepository-1.0"),
-            "GSETTINGS_SCHEMA_DIR": str(appdir / "usr" / "share" / "glib-2.0" / "schemas"),
-            "XDG_DATA_DIRS": str(appdir / "usr" / "share") + ":" + env.get("XDG_DATA_DIRS", "/usr/local/share:/usr/share"),
-            "XDG_CONFIG_DIRS": str(appdir / "etc" / "xdg") + ":" + env.get("XDG_CONFIG_DIRS", "/etc/xdg"),
-            "PATH": str(appdir / "usr" / "bin") + ":" + env.get("PATH", "/usr/bin:/bin"),
-        })
-        appdir_key = str(appdir)
-        if appdir_key not in LIBRARY_PATH_CACHE:
-            LIBRARY_PATH_CACHE[appdir_key] = ":".join(sorted({
-                str(path.parent)
-                for path in appdir.rglob("*.so*")
-                if path.is_file()
-            }))
-        library_path = LIBRARY_PATH_CACHE[appdir_key]
-        existing_library_path = env.get("LD_LIBRARY_PATH")
-        if existing_library_path:
-            library_path += ":" + existing_library_path
-        env["LD_LIBRARY_PATH"] = library_path
-        env.pop("APPIMAGE_EXTRACT_AND_RUN", None)
-        python = appdir / "usr" / "bin" / "python3"
-        entrypoint = appdir / "usr" / "share" / "faultline" / "launch.py"
+        # AppRun v2 reads AppRun.env next to itself and establishes APPDIR,
+        # library paths, Python/GI paths, and the remaining runtime helpers.
+        for key in ("APPDIR", "APPIMAGE", "ARGV0", "OWD", "APPIMAGE_EXTRACT_AND_RUN"):
+            env.pop(key, None)
+        executable = target / "AppRun"
         command = [
             "dbus-run-session", "--", "xvfb-run", "-a",
-            str(python), str(entrypoint), "--smoke-test",
+            str(executable), "--smoke-test",
         ]
     else:
         # Let the AppImage runtime establish APPIMAGE, APPDIR, ARGV0, and OWD.
