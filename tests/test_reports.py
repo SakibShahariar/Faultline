@@ -2,6 +2,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from faultline.models import Boot, Event, Finding
 from faultline.reports import build_report, redact_text, render_markdown, write_report
@@ -12,13 +13,17 @@ class ReportTests(unittest.TestCase):
     def test_redacts_common_sensitive_values(self):
         value = (
             "Path /home/alice/file, mail alice@example.com, IP 192.168.1.10, "
-            "MAC aa:bb:cc:dd:ee:ff, Bearer secret-token"
+            "MAC aa:bb:cc:dd:ee:ff, Bearer secret-token "
+            "--password secret --api-key=another-secret workstation"
         )
-        redacted = redact_text(value)
+        with patch("faultline.reports.socket.gethostname", return_value="workstation"):
+            redacted = redact_text(value)
         for secret in ("alice", "alice@example.com", "192.168.1.10",
-                       "aa:bb:cc:dd:ee:ff", "secret-token"):
+                       "aa:bb:cc:dd:ee:ff", "secret-token", "secret",
+                       "another-secret", "workstation"):
             self.assertNotIn(secret, redacted)
         self.assertIn("~", redacted)
+        self.assertIn("<redacted-host>", redacted)
 
     def test_builds_redacted_json_and_markdown(self):
         with tempfile.TemporaryDirectory() as directory:
