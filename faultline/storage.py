@@ -141,22 +141,61 @@ class Database:
         replace_categories: Iterable[str] | None = None,
     ) -> None:
         rows = list(findings)
-        categories = None if replace_categories is None else sorted(set(replace_categories))
         with self.connection:
-            if categories is None:
-                self.connection.execute("DELETE FROM findings WHERE boot_id = ?", (boot_id,))
-            elif categories:
-                placeholders = ",".join("?" for _ in categories)
-                self.connection.execute(
-                    f"DELETE FROM findings WHERE boot_id = ? AND category IN ({placeholders})",
-                    [boot_id, *categories],
-                )
-            if rows:
-                self.connection.executemany("""
-                    INSERT INTO findings(boot_id,category,title,summary,confidence,evidence_json)
-                    VALUES(?,?,?,?,?,?)
-                """, [(boot_id, f.category, f.title, f.summary, f.confidence,
-                       json.dumps(f.evidence)) for f in rows])
+            if replace_categories is None:
+                categories = {
+                    row["category"] for row in self.connection.execute(
+                        "SELECT DISTINCT category FROM findings WHERE boot_id = ?",
+                        (boot_id,),
+                    ).fetchall()
+                }
+                categories.update(f.category for f in rows)
+            else:
+                categories = set(replace_categories)
+
+            for category in categories:
+                titles = [f.title for f in rows if f.category == category]
+                if titles:
+                    placeholders = ",".join("?" for _ in titles)
+                    self.connection.execute(
+                        f"DELETE FROM findings WHERE boot_id = ? AND category = ? "
+                        f"AND title NOT IN ({placeholders})",
+                        [boot_id, category, *titles],
+                    )
+                else:
+                    self.connection.execute(
+                        "DELETE FROM findings WHERE boot_id = ? AND category = ?",
+                        (boot_id, category),
+                    )
+
+            new_findings = []
+            for finding in rows:
+                evidence_json = json.dumps(finding.evidence)
+                existing = self.connection.execute("""
+                    SELECT id FROM findings WHERE boot_id = ? AND category = ? AND title = ?
+                    ORDER BY id LIMIT 1
+                """, (boot_id, finding.category, finding.title)).fetchone()
+                if existing:
+                    self.connection.execute("""
+                        UPDATE findings SET summary = ?, confidence = ?, evidence_json = ?
+                        WHERE id = ?
+                    """, (finding.summary, finding.confidence, evidence_json, existing["id"]))
+                else:
+                    cursor = self.connection.execute("""
+                        INSERT INTO findings(
+                            boot_id,category,title,summary,confidence,evidence_json
+                        ) VALUES(?,?,?,?,?,?)
+                    """, (boot_id, finding.category, finding.title, finding.summary,
+                          finding.confidence, evidence_json))
+                    new_findings.append({
+                        "id": cursor.lastrowid,
+                        "boot_id": boot_id,
+                        "category": finding.category,
+                        "title": finding.title,
+                        "summary": finding.summary,
+                        "confidence": finding.confidence,
+                    })
+            return new_findings
 
     def add_sample(self, sample: dict) -> None:
         with self.connection:
