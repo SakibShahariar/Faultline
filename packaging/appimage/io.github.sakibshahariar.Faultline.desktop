@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Faultline
+Comment=Diagnose Linux crashes and inspect system failure evidence
+Exec=faultline-app
+Icon=io.github.sakibshahariar.Faultline
+Terminal=false
+Categories=System;Utility;GTK;
+StartupNotify=true
+Keywords=crash;diagnostics;journal;kernel;systemd;forensics;
