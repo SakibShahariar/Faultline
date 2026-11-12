@@ -41,6 +41,7 @@ python3 -m unittest discover -s tests -v
 python3 -m compileall -q faultline tests demo/native
 
 %files -f %{pyproject_files}
+%license LICENSE
 %{_bindir}/faultline
 %{_bindir}/faultline-gui
 %{_datadir}/faultline/demo/native/main.py
