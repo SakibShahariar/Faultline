@@ -513,8 +513,24 @@ class FaultlineWindow(Adw.ApplicationWindow):
             group.add(row)
 
         group = self.group(page, "Notifications",
-                           "Next-login incident notifications are planned but are not implemented yet.")
-        self.action_row(group, "Desktop notifications", "Not active in this version.")
+                           "The background collector can notify about newly detected findings after login.")
+        notify_row = Adw.SwitchRow()
+        notify_row.set_title("Notify about new incidents")
+        notify_row.set_subtitle("Do not repeat notifications for findings already stored.")
+        notify_row.set_active(bool(settings["notify_new_incidents"]))
+        notify_row.connect("notify::active", self.on_setting_switch, "notify_new_incidents")
+        group.add(notify_row)
+        severity_row = Adw.ActionRow()
+        severity_row.set_title("Minimum notification severity")
+        severity_dropdown = Gtk.DropDown.new_from_strings(["Low", "Medium", "High"])
+        severity_dropdown.set_selected(
+            {"low": 0, "medium": 1, "high": 2}.get(
+                settings["notification_min_severity"], 0
+            )
+        )
+        severity_dropdown.connect("notify::selected", self.on_notification_severity_changed)
+        severity_row.add_suffix(severity_dropdown)
+        group.add(severity_row)
 
         self.show_page("overview")
 
@@ -598,6 +614,12 @@ class FaultlineWindow(Adw.ApplicationWindow):
         self.pages = {}
         self._build_pages()
         self.toast("Local diagnostic history cleared.")
+
+    def on_notification_severity_changed(self, dropdown, _property):
+        from faultline.settings import update_setting
+        severity = ["low", "medium", "high"][dropdown.get_selected()]
+        update_setting("notification_min_severity", severity)
+        self.toast("Notification preference saved.")
 
     def on_setting_switch(self, row, _property, key):
         from faultline.settings import update_setting
