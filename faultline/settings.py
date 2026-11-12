@@ -19,6 +19,16 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "notify_new_incidents": True,
     "notification_min_severity": "low",
 }
+_BOOLEAN_SETTINGS = {
+    "collect_coredumps", "collect_pstore", "correlate_extensions",
+    "redact_reports", "background_sampler", "notify_new_incidents",
+}
+_NUMERIC_SETTINGS = {
+    "retention_days": (90, 1, 3650),
+    "max_boots_per_scan": (10, 1, 100),
+    "sample_interval_seconds": (10, 2, 300),
+    "sample_retention_hours": (24, 1, 720),
+}
 
 
 def settings_path() -> Path:
@@ -26,41 +36,43 @@ def settings_path() -> Path:
     return config_home / "faultline" / "settings.json"
 
 
-def load_settings() -> dict[str, Any]:
-    path = settings_path()
+def _bounded_int(value: Any, default: int, minimum: int, maximum: int) -> int:
+    if isinstance(value, bool):
+        return default
     try:
-        loaded = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        loaded = {}
+        number = int(value)
+    except (TypeError, ValueError, OverflowError):
+        return default
+    return max(minimum, min(maximum, number))
+
+
+def _normalize_settings(values: dict[str, Any] | None) -> dict[str, Any]:
     settings = DEFAULT_SETTINGS.copy()
-    if isinstance(loaded, dict):
-        settings.update({key: value for key, value in loaded.items()
-                         if key in DEFAULT_SETTINGS})
-    settings["retention_days"] = _bounded_int(settings["retention_days"], 90, 1, 3650)
-    settings["max_boots_per_scan"] = _bounded_int(settings["max_boots_per_scan"], 10, 1, 100)
-    settings["sample_interval_seconds"] = _bounded_int(
-        settings["sample_interval_seconds"], 10, 2, 300
-    )
-    settings["sample_retention_hours"] = _bounded_int(
-        settings["sample_retention_hours"], 24, 1, 720
-    )
+    if isinstance(values, dict):
+        settings.update({
+            key: value for key, value in values.items()
+            if key in DEFAULT_SETTINGS
+        })
+    for name in _BOOLEAN_SETTINGS:
+        if not isinstance(settings[name], bool):
+            settings[name] = DEFAULT_SETTINGS[name]
+    for name, (default, minimum, maximum) in _NUMERIC_SETTINGS.items():
+        settings[name] = _bounded_int(settings[name], default, minimum, maximum)
     if settings["notification_min_severity"] not in {"low", "medium", "high"}:
         settings["notification_min_severity"] = "low"
     return settings
 
 
-def _bounded_int(value: Any, default: int, minimum: int, maximum: int) -> int:
+def load_settings() -> dict[str, Any]:
     try:
-        number = int(value)
-    except (TypeError, ValueError):
-        return default
-    return max(minimum, min(maximum, number))
+        loaded = json.loads(settings_path().read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        loaded = {}
+    return _normalize_settings(loaded)
 
 
 def save_settings(settings: dict[str, Any]) -> None:
-    merged = DEFAULT_SETTINGS.copy()
-    merged.update({key: value for key, value in settings.items()
-                   if key in DEFAULT_SETTINGS})
+    merged = _normalize_settings(settings)
     path = settings_path()
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     temporary = path.with_suffix(".json.tmp")
@@ -77,6 +89,10 @@ def save_settings(settings: dict[str, Any]) -> None:
 def update_setting(name: str, value: Any) -> dict[str, Any]:
     if name not in DEFAULT_SETTINGS:
         raise KeyError(name)
+    if name in _BOOLEAN_SETTINGS and not isinstance(value, bool):
+        raise ValueError(f"{name} must be a boolean")
+    if name == "notification_min_severity" and value not in {"low", "medium", "high"}:
+        raise ValueError("notification_min_severity must be low, medium, or high")
     settings = load_settings()
     settings[name] = value
     save_settings(settings)
