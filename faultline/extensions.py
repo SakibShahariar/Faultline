@@ -91,7 +91,7 @@ def correlate_extension_events(
 ) -> tuple[list[Event], list[Finding]]:
     """Match explicit enabled-extension errors to nearby Shell/Mutter failures."""
     shell_events = shell_events or []
-    correlated: dict[tuple[str, str], list[str]] = {}
+    correlated: dict[tuple[str, str, str, str], list[str]] = {}
     matched_events = []
 
     for event in events:
@@ -123,23 +123,33 @@ def correlate_extension_events(
         event.metadata["extension_id"] = extension_id
         event.metadata["correlated_shell_failures"] = len(nearby_failures)
         matched_events.append(event)
-        evidence = [event.message[:500]] + [
-            failure.message[:500] for failure in nearby_failures[:5]
-        ]
-        correlated.setdefault((event.boot_id, extension_id), []).extend(evidence)
+        for failure in nearby_failures:
+            incident_key = (
+                event.boot_id,
+                extension_id,
+                failure.timestamp,
+                failure.signature or failure.message[:120],
+            )
+            correlated.setdefault(incident_key, []).extend([
+                event.message[:500],
+                failure.message[:500],
+            ])
 
     findings = [
         Finding(
             category="extension-error",
-            title=f"Extension error near a Shell/Mutter failure: {extension_id}",
+            title=(
+                f"Extension error near a Shell/Mutter failure: {extension_id} "
+                f"({incident_time})"
+            ),
             summary=(
                 "An error record explicitly references this enabled extension within "
-                "five minutes of a GNOME Shell or Mutter failure. This is temporal "
+                "five minutes of this GNOME Shell or Mutter failure. This is temporal "
                 "correlation only; it does not prove the extension caused the failure."
             ),
             confidence="moderate",
-            evidence=messages[:20],
+            evidence=list(dict.fromkeys(messages))[:20],
         )
-        for (_boot_id, extension_id), messages in correlated.items()
+        for (_boot_id, extension_id, incident_time, _signature), messages in correlated.items()
     ]
     return matched_events, findings
