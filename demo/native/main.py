@@ -13,12 +13,6 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-import gi
-
-gi.require_version("Gtk", "4.0")
-gi.require_version("Adw", "1")
-from gi.repository import Adw, Gio, GLib, Gtk
-
 _STARTUP_T0 = float(os.environ.get("FAULTLINE_STARTUP_T0", time.perf_counter()))
 
 
@@ -27,6 +21,14 @@ def startup_trace(event):
         elapsed = time.perf_counter() - _STARTUP_T0
         print(f"[Faultline startup] {event}: {elapsed:.3f}s", file=sys.stderr, flush=True)
 
+
+import gi
+
+startup_trace("PyGObject imported")
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+startup_trace("GTK and libadwaita versions selected")
+from gi.repository import Adw, Gio, GLib, Gtk
 
 startup_trace("GTK and libadwaita imported")
 
