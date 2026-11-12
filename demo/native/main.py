@@ -16,6 +16,21 @@ gi.require_version("Adw", "1")
 from gi.repository import Adw, Gio, GLib, Gtk
 
 
+def evidence_detail(event):
+    metadata = json.loads(event["metadata_json"])
+    lines = [event["message"]]
+    if metadata.get("command"):
+        lines.append("Command: " + metadata["command"])
+    if metadata.get("uid") is not None:
+        lines.append("UID: " + str(metadata["uid"]))
+    if event["source"] == "systemd-coredump":
+        lines.append(
+            "Stack trace summary: " +
+            (metadata.get("stack_summary") or "not available from coredump metadata")
+        )
+    return "\\n".join(lines)
+
+
 def load_incidents():
     """Load only real findings from the local Faultline database."""
     from faultline.storage import Database
@@ -37,7 +52,7 @@ def load_incidents():
                 ).fetchone()["evidence_json"]
             ))
             events = db.connection.execute("""
-                SELECT timestamp, source, message, metadata_json FROM events
+                SELECT timestamp, source, message, event_type, metadata_json FROM events
                 WHERE boot_id = ? ORDER BY timestamp LIMIT 200
             """, (row["boot_id"],)).fetchall()
             events = [event for event in events if event["message"] in evidence_messages]
