@@ -134,6 +134,20 @@ class Database:
             """, [r + (r[0], r[1], r[2], r[7]) for r in rows])
             return self.connection.total_changes - before
 
+    def update_event_metadata(self, event: Event) -> None:
+        with self.connection:
+            self.connection.execute("""
+                UPDATE events SET event_type = ?, metadata_json = ?
+                WHERE boot_id = ? AND timestamp = ? AND source = ? AND signature = ?
+            """, (
+                event.event_type,
+                json.dumps(event.metadata, sort_keys=True),
+                event.boot_id,
+                event.timestamp,
+                event.source,
+                event.signature,
+            ))
+
     def add_findings(
         self,
         boot_id: str,
