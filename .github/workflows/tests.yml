@@ -123,7 +123,7 @@ jobs:
           test -f /usr/lib/systemd/user/faultline-collector.timer
           test -f /usr/lib/systemd/user/faultline-sampler.service
           set +e
-          timeout 8s dbus-run-session -- xvfb-run -a faultline-gui
+          timeout 8s dbus-run-session -- xvfb-run -a env FAULTLINE_STARTUP_TRACE=1 faultline-gui
           gui_status=$?
           set -e
           if [ "$gui_status" -ne 124 ]; then

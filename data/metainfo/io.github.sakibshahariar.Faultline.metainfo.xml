@@ -16,6 +16,9 @@
   <url type="homepage">https://github.com/SakibShahariar/Faultline</url>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.2" date="2026-11-12">
+      <description><p>Prepare the Fedora 45 RPM and portable AppImage distribution.</p></description>
+    </release>
     <release version="0.1.1" date="2026-11-12">
       <description><p>First public release with portable AppImage packaging and Fedora RPM support.</p></description>
     </release>

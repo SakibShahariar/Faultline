@@ -1,7 +1,8 @@
 # AppImage packaging
 
 Faultline's AppImage is an additional x86_64 distribution format. The Fedora RPM
-remains the preferred native package on Fedora.
+remains the preferred native package on Fedora. The AppImage's bundled GTK
+runtime has a known slower startup path; the native RPM uses the host GTK stack.
 
 ## Build
 
@@ -28,11 +29,11 @@ export PATH="$PWD:$PATH"
 Build from the repository root:
 
 ```sh
-APP_VERSION=0.1.1 APPIMAGE_EXTRACT_AND_RUN=1 \
+APP_VERSION=0.1.2 APPIMAGE_EXTRACT_AND_RUN=1 \
   ./appimage-builder --recipe packaging/appimage/AppImageBuilder.yml --skip-test
 ```
 
-The output is `Faultline-0.1.1-x86_64.AppImage`. The CI workflow builds this
+The output is `Faultline-0.1.2-x86_64.AppImage`. The CI workflow builds this
 artifact on pushes, pull requests, and version tags; it also produces a SHA-256
 checksum and runs the AppImage in a clean Ubuntu container without network
 access, host Python, or host GTK packages. The GUI smoke test runs against the bundled runtime under X11 and a headless Wayland compositor, verifies the window and navigation widgets, and exercises the collapsed navigation layout.
@@ -42,23 +43,23 @@ access, host Python, or host GTK packages. The GUI smoke test runs against the b
 Make the file executable and launch it:
 
 ```sh
-chmod +x Faultline-0.1.1-x86_64.AppImage
-./Faultline-0.1.1-x86_64.AppImage
+chmod +x Faultline-0.1.2-x86_64.AppImage
+./Faultline-0.1.2-x86_64.AppImage
 ```
 
 The graphical application opens by default. The CLI is available through the
 same file:
 
 ```sh
-./Faultline-0.1.1-x86_64.AppImage --cli scan
-./Faultline-0.1.1-x86_64.AppImage --cli boots
-./Faultline-0.1.1-x86_64.AppImage --cli report --format markdown --output ~/faultline-report.md
+./Faultline-0.1.2-x86_64.AppImage --cli scan
+./Faultline-0.1.2-x86_64.AppImage --cli boots
+./Faultline-0.1.2-x86_64.AppImage --cli report --format markdown --output ~/faultline-report.md
 ```
 
 If FUSE 2 is unavailable on the host, try the AppImage extraction fallback:
 
 ```sh
-APPIMAGE_EXTRACT_AND_RUN=1 ./Faultline-0.1.1-x86_64.AppImage
+APPIMAGE_EXTRACT_AND_RUN=1 ./Faultline-0.1.2-x86_64.AppImage
 ```
 
 ## Runtime requirements and limitations
@@ -86,7 +87,7 @@ Replacing or deleting the AppImage does not remove either directory. The optiona
 systemd user unit files are included inside the image at
 `usr/share/faultline/systemd/user`; they are not installed or enabled
 automatically. To inspect or install them manually, extract the image with
-`./Faultline-0.1.1-x86_64.AppImage --appimage-extract` and copy the desired
+`./Faultline-0.1.2-x86_64.AppImage --appimage-extract` and copy the desired
 units into `~/.config/systemd/user/`.
 
 
@@ -104,7 +105,7 @@ for run in first warm-1 warm-2; do
   /usr/bin/time -f "wall-clock: %e seconds" \
     dbus-run-session -- xvfb-run -a \
       env GTK_A11Y=none GDK_BACKEND=x11 FAULTLINE_STARTUP_TRACE=1 \
-      ./Faultline-0.1.1-x86_64.AppImage --smoke-test
+      ./Faultline-0.1.2-x86_64.AppImage --smoke-test
 done
 ```
 
