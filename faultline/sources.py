@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import json
+import selectors
 import shutil
 import subprocess
+import time
 from datetime import datetime, timezone
 from typing import Iterable
 
@@ -29,12 +31,11 @@ def _run(command: list[str], timeout: int = 30) -> subprocess.CompletedProcess[s
     return result
 
 
-def list_boots() -> list[Boot]:
-    result = _run(["journalctl", "--list-boots", "--no-pager"])
+def parse_boot_list(lines: Iterable[str]) -> list[Boot]:
     boots: list[Boot] = []
-    for line in result.stdout.splitlines():
+    for line in lines:
         parts = line.split()
-        if len(parts) < 3:
+        if len(parts) < 5:
             continue
         try:
             index = int(parts[0])
@@ -47,6 +48,11 @@ def list_boots() -> list[Boot]:
                           last_seen=" ".join(parts[-2:]) or None,
                           index=index, current=index == 0))
     return boots
+
+
+def list_boots() -> list[Boot]:
+    result = _run(["journalctl", "--list-boots", "--no-pager"])
+    return parse_boot_list(result.stdout.splitlines())
 
 
 def parse_journal_json(lines: Iterable[str], boot_id: str) -> list[Event]:
@@ -95,3 +101,40 @@ def read_boot_events(boot_id: str, since: str | None = None) -> list[Event]:
         command.append(f"--since={since}")
     result = _run(command, timeout=90)
     return parse_journal_json(result.stdout.splitlines(), boot_id)
+
+
+
+def iter_boot_events(boot_id: str, timeout: int = 90):
+    """Yield journal events one JSON record at a time with a bounded idle timeout."""
+    command = ["journalctl", f"--boot={boot_id}", "--output=json", "--no-pager", "--quiet"]
+    if not shutil.which(command[0]):
+        raise SourceError(f"Required command not found: {command[0]}")
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                               text=True, encoding="utf-8", errors="replace", bufsize=1)
+    assert process.stdout is not None
+    selector = selectors.DefaultSelector()
+    selector.register(process.stdout, selectors.EVENT_READ)
+    last_activity = time.monotonic()
+    try:
+        while True:
+            ready = selector.select(timeout=max(0.1, timeout - (time.monotonic() - last_activity)))
+            if not ready:
+                process.kill()
+                process.wait()
+                raise SourceError("journalctl timed out while reading boot records")
+            line = process.stdout.readline()
+            if line == "":
+                break
+            last_activity = time.monotonic()
+            yield from parse_journal_json([line], boot_id)
+        return_code = process.wait(timeout=5)
+        if return_code:
+            raise SourceError(f"journalctl exited with status {return_code}")
+    except Exception:
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+        raise
+    finally:
+        selector.close()
+        process.stdout.close()
