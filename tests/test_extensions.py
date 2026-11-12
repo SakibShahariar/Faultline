@@ -65,7 +65,7 @@ class ExtensionCorrelationTests(unittest.TestCase):
         self.assertEqual(len(correlated), 2)
         self.assertEqual(len(findings), 1)
         self.assertEqual(findings[0].confidence, "moderate")
-        self.assertEqual(len(findings[0].evidence), 4)
+        self.assertEqual(len(findings[0].evidence), 6)
 
     def test_extension_error_without_nearby_shell_failure_is_not_a_suspect(self):
         message = "JS ERROR: TypeError at /extensions/blur-my-shell@aunetx/extension.js"
