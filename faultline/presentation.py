@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta, timezone
 
 from .storage import Database
 
@@ -111,16 +112,24 @@ def load_source_status(database: Database | None = None) -> dict:
     own_database = database is None
     db = database or Database()
     try:
-        return {
-            row["source"]: {
+        statuses = {}
+        for row in db.connection.execute(
+            "SELECT source, available, detail, checked_at FROM source_status"
+        ).fetchall():
+            try:
+                checked = datetime.fromisoformat(row["checked_at"].replace("Z", "+00:00"))
+                if checked.tzinfo is None:
+                    checked = checked.replace(tzinfo=timezone.utc)
+                stale = datetime.now(timezone.utc) - checked > timedelta(hours=24)
+            except (TypeError, ValueError):
+                stale = True
+            statuses[row["source"]] = {
                 "available": bool(row["available"]),
                 "detail": row["detail"],
                 "checked_at": row["checked_at"],
+                "stale": stale,
             }
-            for row in db.connection.execute(
-                "SELECT source, available, detail, checked_at FROM source_status"
-            ).fetchall()
-        }
+        return statuses
     finally:
         if own_database:
             db.close()
