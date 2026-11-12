@@ -18,5 +18,6 @@ def normalize_message(message: str) -> str:
 
 
 def signature_for(message: str, source: str = "") -> str:
-    normalized = f"{source.lower()}:{normalize_message(message)}"
+    """Build a source-independent signature so overlapping collectors can link records."""
+    normalized = normalize_message(message)
     return hashlib.sha256(normalized.encode("utf-8", errors="replace")).hexdigest()[:20]
