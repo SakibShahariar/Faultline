@@ -86,10 +86,11 @@ def launch_command(target: Path, *, appimage: Path, direct_apprun: bool):
             library_path += ":" + existing_library_path
         env["LD_LIBRARY_PATH"] = library_path
         env.pop("APPIMAGE_EXTRACT_AND_RUN", None)
-        executable = appdir / "usr" / "bin" / "faultline-app"
+        python = appdir / "usr" / "bin" / "python3"
+        entrypoint = appdir / "usr" / "share" / "faultline" / "launch.py"
         command = [
             "dbus-run-session", "--", "xvfb-run", "-a",
-            str(executable), "--smoke-test",
+            str(python), str(entrypoint), "--smoke-test",
         ]
     else:
         # Let the AppImage runtime establish APPIMAGE, APPDIR, ARGV0, and OWD.
@@ -218,7 +219,8 @@ def benchmark(args):
                     samples_by_mode[mode_name].append(sample)
                     if sample["returncode"] != 0:
                         raise RuntimeError(
-                            f"{mode_name} trial {index + 1} failed: {sample['stderr'][-2000:]}"
+                            f"{mode_name} trial {index + 1} failed: "
+                            f"{sample['combined_output'][-5000:]}"
                         )
                     if "main window mapped" not in sample["milestones_seconds"]:
                         raise RuntimeError(
