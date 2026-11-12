@@ -28,9 +28,10 @@ Preferences pages use actual GTK4/libadwaita widgets. Reports support Markdown a
 JSON, with a preview and configurable privacy redaction. Source access, retention,
 and scan-limit settings are persisted under `~/.config/faultline/settings.json`.
 
-The optional systemd user timer is documented in the repository README. Resource
-sampling and next-login notifications are not implemented yet; those pages describe
-their status instead of showing fabricated values.
+The optional systemd user timer and resource sampler service are documented in the
+repository README. The sampler can be enabled from Preferences after installing its
+user unit; interval and retention are configurable. Next-login notifications are
+not implemented yet; the UI describes their status instead of showing fabricated values.
 
 The database is stored at `~/.local/share/faultline/crashes.db` by default. It may be
 moved under `$XDG_DATA_HOME` when that environment variable is set.
