@@ -69,7 +69,7 @@ jobs:
         run: |
           dnf install -y nodejs git rpm-build redhat-rpm-config pyproject-rpm-macros \
             python3-devel python3-pip python3-setuptools python3-gobject \
-            gtk4 libadwaita systemd-rpm-macros tar gzip
+            gtk4 libadwaita systemd-rpm-macros xorg-x11-server-Xvfb dbus-daemon tar gzip
       - name: Create source archive from the checked-out commit
         run: |
           mkdir -p "$HOME/rpmbuild/SOURCES"
@@ -91,3 +91,16 @@ jobs:
           test -f /usr/share/metainfo/io.github.sakibshahariar.Faultline.metainfo.xml
           test -f /usr/lib/systemd/user/faultline-collector.timer
           test -f /usr/lib/systemd/user/faultline-sampler.service
+          set +e
+          timeout 8s dbus-run-session -- xvfb-run -a faultline-gui
+          gui_status=$?
+          set -e
+          if [ "$gui_status" -ne 124 ]; then
+            echo "Installed GUI exited unexpectedly with status $gui_status"
+            exit 1
+          fi
+          mkdir -p "$HOME/.local/share/faultline"
+          printf 'keep-user-data\n' > "$HOME/.local/share/faultline/keep.txt"
+          dnf remove -y faultline
+          test -f "$HOME/.local/share/faultline/keep.txt"
+          test ! -f /usr/lib/systemd/user/faultline-collector.timer
