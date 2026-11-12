@@ -1,0 +1,15 @@
+[Unit]
+Description=Faultline local diagnostic collection
+Documentation=https://github.com/SakibShahariar/Faultline
+After=default.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/faultline scan
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.local/share/faultline
