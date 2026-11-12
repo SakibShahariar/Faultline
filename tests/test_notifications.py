@@ -24,7 +24,8 @@ class NotificationTests(unittest.TestCase):
         self.assertEqual(count, 1)
         command = spawn.call_args.args[0]
         self.assertIn("FL-0002", command)
-        self.assertEqual(command[2], "-m")
+        self.assertEqual(command[1], "-m")
+        self.assertEqual(command[2], "faultline.notifications")
 
     def test_clicking_notification_launches_matching_incident(self):
         argv = [
