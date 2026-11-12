@@ -28,7 +28,7 @@ def load_incidents(database: Database | None = None) -> list[dict]:
             ))
             events = db.connection.execute("""
                 SELECT timestamp, source, message, signature, event_type, metadata_json FROM events
-                WHERE boot_id = ? ORDER BY timestamp LIMIT 200
+                WHERE boot_id = ? ORDER BY timestamp LIMIT 201
             """, (row["boot_id"],)).fetchall()
             grouped_events = {}
             for event in events:
@@ -45,7 +45,14 @@ def load_incidents(database: Database | None = None) -> list[dict]:
                     if event["source"] == "systemd-coredump":
                         grouped_events[key]["metadata_json"] = event["metadata_json"]
                         grouped_events[key]["source"] = event["source"]
-            events = list(grouped_events.values())
+            all_events = list(grouped_events.values())
+            evidence_count = db.connection.execute(
+                "SELECT COUNT(DISTINCT timestamp || '|' || signature) FROM events "
+                "WHERE boot_id = ? AND message IN (" +
+                ",".join("?" for _ in evidence_messages) + ")",
+                [row["boot_id"], *evidence_messages],
+            ).fetchone()[0] if evidence_messages else 0
+            events = all_events[:50]
             severity = {
                 "kernel-panic": "High",
                 "storage-error": "High",
@@ -72,7 +79,7 @@ def load_incidents(database: Database | None = None) -> list[dict]:
                 "evidence": [
                     (
                         event["timestamp"],
-                        event["source"],
+                        ", ".join(sorted(event["sources"])),
                         event["message"] + (
                             "\nCommand: " + (json.loads(event["metadata_json"]).get("command") or "")
                             if json.loads(event["metadata_json"]).get("command") else ""
@@ -80,6 +87,8 @@ def load_incidents(database: Database | None = None) -> list[dict]:
                     )
                     for event in events
                 ],
+                "evidence_count": evidence_count,
+                "evidence_truncated": evidence_count > len(events),
                 "causes": [],
             })
         return incidents
