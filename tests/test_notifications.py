@@ -54,6 +54,19 @@ class NotificationTests(unittest.TestCase):
         self.assertIn("--incident-id", command)
         self.assertIn("FL-0007", command)
 
+    def test_missing_desktop_notification_service_does_not_break_collection(self):
+        finding = {"id": 1, "category": "oom", "title": "OOM", "summary": "evidence"}
+        with patch("faultline.notifications.shutil.which", return_value=None), \
+             patch("faultline.notifications.subprocess.run") as run:
+            self.assertEqual(
+                dispatch_notifications(
+                    [finding],
+                    {"notify_new_incidents": True, "notification_min_severity": "low"},
+                ),
+                0,
+            )
+        run.assert_not_called()
+
     def test_notifications_can_be_disabled(self):
         with patch("faultline.notifications.subprocess.run") as run:
             self.assertEqual(
