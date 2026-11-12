@@ -119,7 +119,7 @@ class StorageTests(unittest.TestCase):
                           "test", signature=signature_for("test"))
             self.assertEqual(db.add_events([event]), 1)
             self.assertEqual(db.add_events([event]), 0)
-            self.assertEqual(db.connection.execute("PRAGMA user_version").fetchone()[0], 2)
+            self.assertEqual(db.connection.execute("PRAGMA user_version").fetchone()[0], 3)
             db.close()
 
 
