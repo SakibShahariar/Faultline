@@ -59,6 +59,39 @@ python3 -m compileall -q faultline tests
 The database is created at
 `~/.local/share/faultline/crashes.db` (or under `$XDG_DATA_HOME` when set).
 
+## Optional background collection
+
+Faultline includes a low-frequency systemd **user** timer. It runs a bounded scan
+three minutes after login and then every six hours. It does not run as root or keep
+a resident process running.
+
+After installing Faultline in editable mode, install and enable the units:
+
+```sh
+mkdir -p ~/.config/systemd/user
+cp data/systemd/user/faultline-collector.service ~/.config/systemd/user/
+cp data/systemd/user/faultline-collector.timer ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now faultline-collector.timer
+```
+
+Check the latest collection:
+
+```sh
+systemctl --user status faultline-collector.timer
+journalctl --user -u faultline-collector.service
+```
+
+Disable background collection:
+
+```sh
+systemctl --user disable --now faultline-collector.timer
+```
+
+The GUI's Scan action remains available independently of the timer. Each scheduled
+scan processes at most the ten most recent boot journals; older collected records
+remain in the local database.
+
 ## Native UI prototype
 
 The primary design reference is the [native GTK4/libadwaita prototype](demo/native/main.py).
