@@ -11,11 +11,11 @@ require administrator privileges.
 - **Collector** — CLI and optional systemd user oneshot service/timer. Scans a
   configurable number of recent boots, bounded to 100 by settings.
 - **Sampler** — optional systemd user service. Samples CPU utilization, memory,
-  swap, readable thermal zones, and supported GPU busy values at a configurable
-  interval. Missing metrics remain NULL, not zero. Samples are pruned by age.
+  swap, readable thermal zones, supported GPU busy values, disk I/O totals, and
+  available block-device error counters at a configurable interval. Missing metrics remain NULL, not zero. Samples are pruned by age.
 - **Sources** — systemd journal, coredump metadata, pstore, and GNOME extension
   adapters. Every adapter reports missing tools or access failures explicitly.
-- **Core** — stable event signatures, deduplication, rule-based classification,
+- **Core** — stable event signatures, deduplication, rule-based classification with explicit counter-evidence,
   shutdown assessment, and extension error correlation.
 - **Storage** — versioned SQLite database (schema version 4) at
   `$XDG_DATA_HOME/faultline/crashes.db` (default
@@ -63,8 +63,8 @@ and missing permissions can all produce incomplete history. OOM activity is not,
 by itself, proof that the machine shut down because of memory exhaustion.
 
 Extension error correlation is not proof of causation. Pstore-to-boot association is
-heuristic. Findings retain confidence and original evidence so users can inspect the
-basis of each classification.
+heuristic. Findings retain confidence, supporting evidence, and explicit counter-evidence
+matches so users can inspect the basis and limits of each classification.
 
 ## Storage and retention
 
@@ -77,9 +77,9 @@ on a guess. Resource samples have a separate configurable retention window.
 
 ## Current limitations
 
-The sampler, actionable next-login notifications, parser fixtures, and basic
-cross-boot recurrence queries are implemented. The native UI currently reads its
-initial cached view models synchronously during startup; moving all startup and
-detail queries off the GTK main loop remains outstanding. Richer recurrence
-navigation and a verified Fedora RPM build also remain outstanding. The application
-reports unsupported sources as unavailable rather than simulating data.
+The sampler, actionable next-login notifications, parser fixtures, cross-boot
+recurrence navigation, and a Fedora RPM build/install check are implemented. The
+native UI loads overview and incident-list view models on a worker thread; the
+small resource-context query on incident-detail activation is still synchronous.
+The application reports unsupported sources as unavailable rather than simulating
+data.
