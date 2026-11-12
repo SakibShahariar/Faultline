@@ -30,7 +30,14 @@ def _merge_findings(target: dict[str, Finding], batch: list[Event]) -> None:
             if evidence not in existing.evidence:
                 existing.evidence.append(evidence)
         existing.evidence = existing.evidence[:20]
-        existing.confidence = "high" if len(existing.evidence) > 1 else "moderate"
+        for evidence in finding.contradicting_evidence:
+            if evidence not in existing.contradicting_evidence:
+                existing.contradicting_evidence.append(evidence)
+        existing.contradicting_evidence = existing.contradicting_evidence[:20]
+        existing.confidence = (
+            "low" if existing.contradicting_evidence else
+            ("high" if len(existing.evidence) > 1 else "moderate")
+        )
 
 
 def scan(database: Database | None = None, notify: bool = False) -> dict:
