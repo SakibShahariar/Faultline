@@ -9,8 +9,8 @@ systemd **user** units. It does not enable background collection automatically.
 Install the RPM build tooling and GTK runtime dependencies:
 
 ```sh
-sudo dnf install rpm-build rpmdevtools python3-devel python3-pip \
-  python3-setuptools python3-gobject gtk4 libadwaita systemd-rpm-macros
+sudo dnf install rpm-build rpmdevtools redhat-rpm-config pyproject-rpm-macros \
+  python3-devel python3-pip python3-setuptools python3-gobject gtk4 libadwaita systemd-rpm-macros
 ```
 
 Prepare the standard RPM build tree, then build from a tagged source archive:
