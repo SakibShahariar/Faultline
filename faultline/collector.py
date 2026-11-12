@@ -44,12 +44,14 @@ def scan(database: Database | None = None) -> dict:
 
         summary["boots_seen"] = len(boots)
         coredumps_by_boot: dict[str, list[Event]] = {}
+        coredump_ok = False
         if settings["collect_coredumps"]:
             try:
                 coredumps = list_coredump_events()
                 for event in coredumps:
                     coredumps_by_boot.setdefault(event.boot_id, []).append(event)
                 summary["coredumps_seen"] = len(coredumps)
+                coredump_ok = True
                 db.set_source_status("coredumpctl", True, f"{len(coredumps)} metadata records read")
             except SourceError as exc:
                 db.set_source_status("coredumpctl", False, str(exc))
@@ -58,9 +60,11 @@ def scan(database: Database | None = None) -> dict:
             db.set_source_status("coredumpctl", False, "Disabled in Faultline settings")
 
         enabled_extensions: set[str] = set()
+        extensions_ok = False
         if settings["correlate_extensions"]:
             try:
                 enabled_extensions = list_enabled_extensions()
+                extensions_ok = True
                 db.set_source_status(
                     "gnome-extensions", True,
                     f"{len(enabled_extensions)} enabled extension(s) discovered"
@@ -73,9 +77,11 @@ def scan(database: Database | None = None) -> dict:
 
         previous_boot = next((boot for boot in boots if boot.index == -1), None)
         pstore_by_boot: dict[str, list[Event]] = {}
+        pstore_ok = False
         if not settings["collect_pstore"]:
             db.set_source_status("pstore", False, "Disabled in Faultline settings")
         elif previous_boot:
+            pstore_ok = True
             pstore_events = read_pstore(previous_boot.boot_id)
             pstore_by_boot[previous_boot.boot_id] = pstore_events
             db.set_source_status(
@@ -164,7 +170,20 @@ def scan(database: Database | None = None) -> dict:
             db.upsert_boot(boot)
             findings = list(findings_by_category.values()) + list(extension_findings.values())
             if journal_ok:
-                db.add_findings(boot.boot_id, findings)
+                replace_categories = {
+                    "oom", "kernel-panic", "gpu-reset", "storage-error",
+                    "shell-crash",
+                }
+                if coredump_ok:
+                    replace_categories.add("application-crash")
+                if pstore_ok:
+                    replace_categories.add("pstore-crash")
+                if extensions_ok:
+                    replace_categories.add("extension-error")
+                db.add_findings(
+                    boot.boot_id, findings,
+                    replace_categories=replace_categories,
+                )
                 summary["findings"] += len(findings)
         summary["boots_pruned"] = db.prune_old_boots(settings["retention_days"])
         return summary
