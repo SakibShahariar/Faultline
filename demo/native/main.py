@@ -71,12 +71,6 @@ def load_incidents():
         db.close()
 
 
-INCIDENTS = load_incidents()
-BOOT_SUMMARY = load_boot_summary()
-SOURCE_STATUS = load_source_status()
-
-
-
 def load_boot_summary():
     from faultline.storage import Database
 
@@ -110,6 +104,11 @@ def load_source_status():
         }
     finally:
         db.close()
+
+
+INCIDENTS = load_incidents()
+BOOT_SUMMARY = load_boot_summary()
+SOURCE_STATUS = load_source_status()
 
 
 class FaultlineWindow(Adw.ApplicationWindow):
@@ -480,7 +479,7 @@ class FaultlineWindow(Adw.ApplicationWindow):
         GLib.idle_add(self._scan_complete, result, error)
 
     def _scan_complete(self, result, error):
-        global INCIDENTS
+        global INCIDENTS, BOOT_SUMMARY, SOURCE_STATUS
         if error:
             self.toast("Scan failed: " + error)
             return GLib.SOURCE_REMOVE
