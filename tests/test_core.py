@@ -64,6 +64,22 @@ class DiagnosisTests(unittest.TestCase):
         event = Event("c" * 32, "now", "app", "app segfault at address")
         self.assertEqual(classify([event])[0].category, "application-crash")
 
+    def test_benign_and_inconclusive_messages_do_not_create_findings(self):
+        events = [
+            Event("c" * 32, "now", "kernel", "CPU frequency changed"),
+            Event("c" * 32, "now", "systemd", "Reached target Multi-User System"),
+        ]
+        self.assertEqual(classify(events), [])
+
+    def test_corroborating_oom_evidence_raises_confidence(self):
+        events = [
+            Event("c" * 32, "now", "kernel", "Out of memory: Killed process 12"),
+            Event("c" * 32, "later", "kernel", "oom-kill:constraint=CONSTRAINT_NONE"),
+        ]
+        finding = classify(events)[0]
+        self.assertEqual(finding.category, "oom")
+        self.assertEqual(finding.confidence, "high")
+
 
 class StorageTests(unittest.TestCase):
     def test_database_migrates_and_deduplicates(self):
