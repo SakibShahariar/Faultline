@@ -21,7 +21,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            curl libfuse2 squashfs-tools fakeroot desktop-file-utils appstream
+            build-essential curl libfuse2 squashfs-tools fakeroot desktop-file-utils appstream
 
       - name: Resolve application version
         run: |
@@ -111,3 +111,10 @@ jobs:
           files: |
             Faultline-${{ env.APP_VERSION }}-x86_64.AppImage
             Faultline-${{ env.APP_VERSION }}-x86_64.AppImage.sha256
+          body: |
+            Faultline 0.1.0 x86_64 AppImage.
+
+            The image bundles Python, PyGObject, GTK 4, and libadwaita. It targets
+            Linux x86_64 with glibc 2.35 or newer. Host systemd diagnostic tools,
+            GNOME session utilities, graphics drivers, and display server remain
+            host-provided. See docs/packaging-appimage.md for runtime details.
