@@ -17,7 +17,7 @@ require administrator privileges.
   adapters. Every adapter reports missing tools or access failures explicitly.
 - **Core** — stable event signatures, deduplication, rule-based classification,
   shutdown assessment, and extension error correlation.
-- **Storage** — versioned SQLite database (schema version 2) at
+- **Storage** — versioned SQLite database (schema version 3) at
   `$XDG_DATA_HOME/faultline/crashes.db` (default
   `~/.local/share/faultline/crashes.db`). Database directories use mode 0700 and
   the database file mode 0600 where supported.
@@ -77,7 +77,9 @@ on a guess. Resource samples have a separate configurable retention window.
 
 ## Current limitations
 
-The sampler, actionable next-login notifications, and basic cross-boot recurrence
-queries are implemented. Richer incident recurrence analysis and Fedora RPM
-packaging remain unimplemented. The application reports these features as unavailable rather than
-simulating data.
+The sampler, actionable next-login notifications, parser fixtures, and basic
+cross-boot recurrence queries are implemented. The native UI currently reads its
+initial cached view models synchronously during startup; moving all startup and
+detail queries off the GTK main loop remains outstanding. Richer recurrence
+navigation and a verified Fedora RPM build also remain outstanding. The application
+reports unsupported sources as unavailable rather than simulating data.
