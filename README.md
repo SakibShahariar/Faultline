@@ -1,76 +1,67 @@
 # Faultline
 
-**Local-first Linux crash diagnosis and system forensics**
+**Local-first Linux crash diagnosis and system forensics.**
 
-Faultline is a native GTK4/libadwaita application with an unprivileged diagnostic
-collector. It examines systemd boot history, journals, coredump metadata, retained
-kernel crash records, and GNOME Shell/extension errors. Findings keep their supporting
-evidence and uncertainty instead of presenting guesses as confirmed root causes.
+Faultline is a native GTK4/libadwaita application and optional user-session
+collector. It gathers available evidence from systemd boot history, the journal,
+coredump metadata, kernel/pstore records, and GNOME Shell/Mutter failures. Findings
+retain their supporting events and uncertainty: correlation is not presented as
+proof of causation.
 
-## Implemented
+## Current capabilities
 
-- Boot discovery with stable systemd boot IDs and first/last timestamps.
-- Incremental journal parsing with bounded reads and source availability reporting.
-- Metadata-only coredump collection; core files are never extracted automatically.
-- Bounded pstore text collection, explicitly associated with the previous boot as a
-  heuristic because pstore records do not reliably carry a systemd boot ID.
-- Rule-based detection for OOM, kernel panic/oops, GPU reset/hang, storage I/O errors,
-  GNOME Shell/Mutter failures, and userspace coredumps.
-- Explicit GNOME extension error correlation when a journal record names an enabled
-  extension. Correlation is not proof of causation.
-- Stable event signatures, duplicate suppression, and local SQLite storage.
-- Conservative shutdown assessment: an abrupt journal ending alone remains unknown.
-- Native GTK4/libadwaita UI connected to real stored findings and evidence.
-- Functional source/privacy/retention preferences.
-- Local Markdown and JSON report export with a preview and configurable redaction.
-- Optional systemd user service and low-frequency timer; no root service.
-- Unit tests and GitHub Actions CI.
+- Boot history and conservative unexpected-shutdown assessment.
+- Bounded, incremental journal collection with source availability reporting.
+- Metadata-only coredump inspection; core files are not extracted automatically.
+- Kernel panic/oops, OOM, GPU reset, storage I/O, GNOME Shell/Mutter, and userspace
+  crash evidence.
+- Explicit extension-error correlation against nearby Shell failures.
+- Event normalization, stable signatures, duplicate suppression, and recurrence
+  matching across boots.
+- Local SQLite storage with schema migrations, retention, and clear-history support.
+- GTK4/libadwaita screens for overview, incidents, evidence, system health,
+  extensions, reports, and preferences.
+- Optional low-frequency resource sampling and optional actionable desktop
+  notifications for newly detected findings.
+- Local Markdown/JSON report export with personal-data redaction enabled by default.
+- Optional systemd **user** timer; no privileged daemon and no automatic upload.
 
-## Not implemented yet
-
-- Pre-incident CPU, memory, swap, temperature, and GPU sampling.
-- Next-login desktop notifications.
-- Full incident recurrence analysis and cross-boot correlation.
-- Dedicated timeline filtering and richer evidence inspection.
-- Fedora RPM packaging and installation/uninstallation integration.
-
-The UI labels these features as unavailable or planned rather than displaying invented
-system data.
+Unsupported or inaccessible sources remain visibly unavailable. Missing metrics
+are represented as unavailable rather than zero, and abrupt journal endings alone
+are not treated as proof of a crash.
 
 ## Fedora development setup
 
-Install dependencies:
+Install the runtime dependencies:
 
 ```sh
-sudo dnf install python3 python3-pip gtk4 libadwaita python3-gobject systemd
+sudo dnf install python3 python3-pip python3-gobject gtk4 libadwaita systemd
 ```
 
-From the repository root:
+Install Faultline from a checkout:
 
 ```sh
 python3 -m pip install --user -e .
 faultline scan
 faultline boots
-python3 demo/native/main.py
+faultline-gui
 ```
 
-Run tests and syntax checks:
+Run automated checks:
 
 ```sh
 python3 -m unittest discover -s tests -v
 python3 -m compileall -q faultline tests demo/native
 ```
 
-The SQLite database is stored at
-`~/.local/share/faultline/crashes.db` by default, or under `$XDG_DATA_HOME`.
+For Fedora RPM build instructions, see
+[docs/packaging-fedora.md](docs/packaging-fedora.md) and the spec at
+[packaging/rpm/faultline.spec](packaging/rpm/faultline.spec).
 
 ## Optional background collection
 
-Faultline includes a systemd **user** timer. It runs a bounded scan three minutes
-after login and then every six hours. It does not run as root or keep a resident
-process running.
-
-Install and enable the units:
+The user timer performs a bounded scan shortly after login and then every six
+hours. It is not enabled automatically:
 
 ```sh
 mkdir -p ~/.config/systemd/user
@@ -81,7 +72,11 @@ systemctl --user daemon-reload
 systemctl --user enable --now faultline-collector.timer
 ```
 
-Inspect or disable it:
+The resource sampler is independently opt-in in Preferences. It records supported
+CPU, memory, swap, thermal, GPU-busy, and disk-I/O counters at the configured
+interval; hardware-specific metrics may be unavailable.
+
+Inspect or disable collection:
 
 ```sh
 systemctl --user status faultline-collector.timer
@@ -89,17 +84,9 @@ journalctl --user -u faultline-collector.service
 systemctl --user disable --now faultline-collector.timer
 ```
 
-The timer is optional; the GUI's Scan action works independently. Scans process at
-most the configured number of recent boot journals (10 by default). Older collected
-records remain until the configured age-based retention policy removes them.
+## Reports and privacy
 
-## Diagnostic report export
-
-From the application, open **Reports** and choose Markdown or JSON. The preview
-summarizes the included boot, finding, and event counts. Personal-data redaction is
-enabled by default.
-
-The CLI can also export reports:
+Open **Reports** to preview and export Markdown or JSON. The CLI equivalents are:
 
 ```sh
 faultline report --format markdown --output ~/faultline-report.md
@@ -109,17 +96,11 @@ faultline report --format json --output ~/faultline-report.json
 Use `--include-sensitive` only when you explicitly need an unredacted local report.
 Review exported files before sharing them.
 
-## Privacy and permissions
-
-The collector runs as the current user. It does not invoke `sudo`, install a privileged
-helper, or upload diagnostic data. Journal and pstore access depend on system
-configuration; inaccessible sources are reported instead of silently escalating
-permissions. Reports are generated locally and only when requested.
-
-A clean shutdown marker is positive evidence of a clean ending. A kernel panic/oops
-is positive evidence of a likely kernel failure. An abrupt journal ending, OOM
-activity, or a pstore-to-previous-boot association is not by itself proof of the
-machine's root cause.
+Faultline stores its database under `$XDG_DATA_HOME/faultline` (normally
+`~/.local/share/faultline`) and preferences under `$XDG_CONFIG_HOME/faultline`.
+The collector runs as the logged-in user. It does not invoke `sudo`, install a
+privileged helper, or upload diagnostic data. Journal and pstore access depend on
+the system's existing permissions.
 
 ## Architecture
 
