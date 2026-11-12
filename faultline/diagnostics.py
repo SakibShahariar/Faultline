@@ -42,20 +42,20 @@ RULES = [
 
 COUNTER_RULES = {
     "oom": re.compile(
-        r"\\bno\\s+(?:recorded\\s+)?(?:out[- ]of[- ]memory|oom(?:-kill| killer)?)\\b|"
-        r"\\b(?:oom|out[- ]of[- ]memory)\\s+(?:was\\s+)?not\\s+detected\\b", re.I),
+        r"\bno\s+(?:recorded\s+)?(?:out[- ]of[- ]memory|oom(?:-kill| killer)?)\b|"
+        r"\b(?:oom|out[- ]of[- ]memory)\s+(?:was\s+)?not\s+detected\b", re.I),
     "kernel-panic": re.compile(
-        r"\\bno\\s+(?:kernel\\s+)?(?:panic|oops)\\b|\\bkernel\\s+panic\\s+not\\s+detected\\b", re.I),
+        r"\bno\s+(?:kernel\s+)?(?:panic|oops)\b|\bkernel\s+panic\s+not\s+detected\b", re.I),
     "gpu-reset": re.compile(
-        r"\\bno\\s+(?:gpu\\s+)?(?:reset|hang)\\b|\\bgpu\\s+(?:reset|hang)\\s+not\\s+detected\\b", re.I),
+        r"\bno\s+(?:gpu\s+)?(?:reset|hang)\b|\bgpu\s+(?:reset|hang)\s+not\s+detected\b", re.I),
     "storage-error": re.compile(
-        r"\\bno\\s+(?:storage|disk|i/o)\\s+errors?\\b|\\bno\\s+nvme\\s+errors?\\b", re.I),
+        r"\bno\s+(?:storage|disk|i/o)\s+errors?\b|\bno\s+nvme\s+errors?\b", re.I),
     "shell-crash": re.compile(
-        r"\\bno\\s+gnome-shell\\s+crash\\b|\\bgnome-shell\\s+did\\s+not\\s+crash\\b", re.I),
+        r"\bno\s+gnome-shell\s+crash\b|\bgnome-shell\s+did\s+not\s+crash\b", re.I),
     "application-crash": re.compile(
-        r"\\bno\\s+application\\s+crash\\b|\\bno\\s+segfaults?\\b", re.I),
+        r"\bno\s+application\s+crash\b|\bno\s+segfaults?\b", re.I),
     "coredump-crash": re.compile(
-        r"\\bno\\s+(?:application\\s+)?coredumps?\\s+(?:were\\s+)?recorded\\b", re.I),
+        r"\bno\s+(?:application\s+)?coredumps?\s+(?:were\s+)?recorded\b", re.I),
 }
 
 
