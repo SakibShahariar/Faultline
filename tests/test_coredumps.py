@@ -24,6 +24,20 @@ class CoredumpParserTests(unittest.TestCase):
         self.assertNotIn("secret2", events[0].metadata["command"])
         self.assertIn("/home/alice/app.conf", events[0].metadata["command"])
         self.assertEqual(events[0].metadata["uid"], None)
+        self.assertIsNone(events[0].metadata["stack_summary"])
+        self.assertFalse(events[0].metadata["stacktrace_available"])
+
+    def test_captures_available_stack_summary_and_uid(self):
+        record = {
+            "COREDUMP_BOOT_ID": "c" * 32,
+            "COREDUMP_EXE": "/usr/bin/example",
+            "COREDUMP_UID": "1000",
+            "COREDUMP_STACKTRACE": ["#0 frame_one", "#1 frame_two"],
+        }
+        event = parse_coredump_json(json.dumps([record]))[0]
+        self.assertEqual(event.metadata["uid"], "1000")
+        self.assertIn("frame_one", event.metadata["stack_summary"])
+        self.assertTrue(event.metadata["stacktrace_available"])
 
     def test_ignores_records_without_valid_boot_id(self):
         self.assertEqual(parse_coredump_json(json.dumps([{"COREDUMP_EXE": "/bin/app"}])), [])
