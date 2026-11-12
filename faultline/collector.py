@@ -22,6 +22,7 @@ def scan(database: Database | None = None) -> dict:
 
         summary["boots_seen"] = len(boots)
         for boot in boots:
+            db.upsert_boot(boot)
             try:
                 events = read_boot_events(boot.boot_id)
             except SourceError as exc:
