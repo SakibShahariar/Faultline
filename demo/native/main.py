@@ -801,7 +801,7 @@ class FaultlineWindow(Adw.ApplicationWindow):
                 incident for incident in INCIDENTS
                 if incident["boot_id"] == occurrence["boot_id"]
                 and any(
-                    evidence[2].split("\\nCommand:", 1)[0] == occurrence["message"]
+                    evidence[2].split("\nCommand:", 1)[0] == occurrence["message"]
                     for evidence in incident["evidence"]
                 )
             ), None)
