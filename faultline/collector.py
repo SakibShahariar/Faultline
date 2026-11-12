@@ -25,9 +25,11 @@ def _merge_findings(target: dict[str, Finding], batch: list[Event]) -> None:
         if existing is None:
             target[finding.category] = finding
             continue
-        existing.evidence.extend(finding.evidence)
+        for evidence in finding.evidence:
+            if evidence not in existing.evidence:
+                existing.evidence.append(evidence)
         existing.evidence = existing.evidence[:20]
-        existing.confidence = "high"
+        existing.confidence = "high" if len(existing.evidence) > 1 else "moderate"
 
 
 def scan(database: Database | None = None, notify: bool = False) -> dict:
