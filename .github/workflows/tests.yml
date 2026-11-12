@@ -76,7 +76,7 @@ jobs:
 
   rpm-build:
     runs-on: ubuntu-latest
-    container: fedora:44
+    container: fedora:45
     steps:
       - uses: actions/checkout@v4
       - name: Install Fedora RPM build dependencies
@@ -131,7 +131,7 @@ jobs:
             exit 1
           fi
           mkdir -p "$HOME/.local/share/faultline"
-          printf 'keep-user-data\n' > "$HOME/.local/share/faultline/keep.txt"
+          printf 'keep-user-data\\n' > "$HOME/.local/share/faultline/keep.txt"
           dnf remove -y faultline
           test -f "$HOME/.local/share/faultline/keep.txt"
           test ! -f /usr/lib/systemd/user/faultline-collector.timer
@@ -140,21 +140,21 @@ jobs:
           rpm_file="$(find "$HOME/rpmbuild/RPMS/noarch" -name '*.rpm' -print -quit)"
           test -n "$rpm_file"
           mkdir -p dist
-          cp "$rpm_file" "dist/Faultline-$APP_VERSION-1.fc44.noarch.rpm"
-          sha256sum "dist/Faultline-$APP_VERSION-1.fc44.noarch.rpm" \
-            | tee "dist/Faultline-$APP_VERSION-1.fc44.noarch.rpm.sha256"
+          cp "$rpm_file" "dist/Faultline-$APP_VERSION-1.fc45.noarch.rpm"
+          sha256sum "dist/Faultline-$APP_VERSION-1.fc45.noarch.rpm" \
+            | tee "dist/Faultline-$APP_VERSION-1.fc45.noarch.rpm.sha256"
       - name: Upload Fedora RPM and checksum
         uses: actions/upload-artifact@v4
         with:
-          name: Faultline-${{ env.APP_VERSION }}-Fedora-44-RPM
+          name: Faultline-${{ env.APP_VERSION }}-Fedora-45-RPM
           path: |
-            dist/Faultline-${{ env.APP_VERSION }}-1.fc44.noarch.rpm
-            dist/Faultline-${{ env.APP_VERSION }}-1.fc44.noarch.rpm.sha256
+            dist/Faultline-${{ env.APP_VERSION }}-1.fc45.noarch.rpm
+            dist/Faultline-${{ env.APP_VERSION }}-1.fc45.noarch.rpm.sha256
           if-no-files-found: error
       - name: Attach RPM to tagged GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/Faultline-${{ env.APP_VERSION }}-1.fc44.noarch.rpm
-            dist/Faultline-${{ env.APP_VERSION }}-1.fc44.noarch.rpm.sha256
+            dist/Faultline-${{ env.APP_VERSION }}-1.fc45.noarch.rpm
+            dist/Faultline-${{ env.APP_VERSION }}-1.fc45.noarch.rpm.sha256

@@ -5,10 +5,10 @@ command-line tools, native GTK4/libadwaita application, desktop entry,
 AppStream metadata, icons, and optional systemd **user** units. It does not
 enable background collection automatically.
 
-The Fedora 44 CI job builds the RPM from the checked-out source, installs it,
+The Fedora 45 CI job builds the RPM from the checked-out source, installs it,
 checks the command-line and GUI entry points, verifies packaged assets, and
 removes the package while confirming that user data is preserved. Tagged
-GitHub releases include the Fedora 44 RPM and its SHA-256 checksum alongside
+GitHub releases include the Fedora 45 RPM and its SHA-256 checksum alongside
 the AppImage.
 
 ## Build locally on Fedora
@@ -73,7 +73,8 @@ desired.
 
 ## Support boundary
 
-The release RPM is built and validated in Fedora 44 CI. The package uses the
-distribution's Python, GTK4, libadwaita, and systemd runtime rather than
-bundling them. Other Fedora versions may work when they provide the required
-dependencies, but are not separately validated by this workflow.
+The RPM build, installation, GUI smoke test, and uninstall/data-preservation
+checks run in Fedora 45 CI. The package uses the distribution's Python, GTK4,
+libadwaita, and systemd runtime rather than bundling them. Other Fedora
+versions may work when they provide the required dependencies, but are not
+separately validated by this workflow.
