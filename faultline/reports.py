@@ -30,7 +30,7 @@ def redact_text(value: str) -> str:
     hostname = socket.gethostname().strip()
     if hostname and hostname not in {"localhost", "localhost.localdomain"}:
         value = re.sub(
-            rf"(?<![\\w.-]){re.escape(hostname)}(?![\\w.-])",
+            rf"(?<![\w.-]){re.escape(hostname)}(?![\w.-])",
             "<redacted-host>", value, flags=re.IGNORECASE,
         )
     return value
