@@ -36,10 +36,15 @@ class CollectorTests(unittest.TestCase):
         result = self.scan_with(lambda _boot_id: iter([event]))
         self.assertEqual(result["boots_seen"], 1)
         self.assertEqual(result["events_added"], 1)
+        self.assertEqual(len(result["new_findings"]), 1)
+        first_finding_id = result["new_findings"][0]["id"]
         self.assertEqual(self.db.connection.execute("SELECT COUNT(*) FROM events").fetchone()[0], 1)
         self.assertEqual(self.db.connection.execute("SELECT COUNT(*) FROM findings").fetchone()[0], 1)
 
-        self.scan_with(lambda _boot_id: iter([event]))
+        second = self.scan_with(lambda _boot_id: iter([event]))
+        self.assertEqual(second["new_findings"], [])
+        stored = self.db.connection.execute("SELECT id FROM findings").fetchone()
+        self.assertEqual(stored["id"], first_finding_id)
         self.assertEqual(self.db.connection.execute("SELECT COUNT(*) FROM events").fetchone()[0], 1)
         self.assertEqual(self.db.connection.execute("SELECT COUNT(*) FROM findings").fetchone()[0], 1)
 
