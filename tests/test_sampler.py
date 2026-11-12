@@ -21,6 +21,9 @@ class SamplerTests(unittest.TestCase):
             (proc / "diskstats").write_text(
                 "8 0 sda 100 0 200 0 50 0 300 0 0 400 0\n"
             )
+            disk_device = sys / "class/block/sda/device"
+            disk_device.mkdir(parents=True)
+            (disk_device / "ioerr_cnt").write_text("3")
             (proc / "sys/kernel/random/boot_id").write_text("a" * 32)
             thermal = sys / "class/thermal/thermal_zone0"
             thermal.mkdir(parents=True)
@@ -39,6 +42,8 @@ class SamplerTests(unittest.TestCase):
             self.assertEqual(sample["metadata"]["disk_read_bytes"], 200 * 512)
             self.assertEqual(sample["metadata"]["disk_write_bytes"], 300 * 512)
             self.assertEqual(sample["metadata"]["disk_io_time_ms"], 400)
+            self.assertEqual(sample["metadata"]["disk_io_errors"], 3)
+            self.assertEqual(sample["metadata"]["disk_error_devices_sampled"], 1)
             self.assertEqual(sample["boot_id"], "a" * 32)
             self.assertEqual(counters, (200, 70))
 
@@ -82,6 +87,8 @@ class SamplerTests(unittest.TestCase):
             self.assertIsNone(sample["memory_used_bytes"])
             self.assertIsNone(sample["temperature_c"])
             self.assertIsNone(sample["gpu_busy_percent"])
+            self.assertIsNone(sample["metadata"]["disk_io_errors"])
+            self.assertEqual(sample["metadata"]["disk_error_devices_sampled"], 0)
 
 
 if __name__ == "__main__":
