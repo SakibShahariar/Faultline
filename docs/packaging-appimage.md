@@ -13,7 +13,7 @@ Install the host build tools on Ubuntu 22.04:
 
 ```sh
 sudo apt-get update
-sudo apt-get install -y curl libfuse2 squashfs-tools fakeroot
+sudo apt-get install -y build-essential curl libfuse2 squashfs-tools fakeroot
 ```
 
 Download the build tools:
