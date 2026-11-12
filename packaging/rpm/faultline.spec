@@ -1,5 +1,5 @@
 Name:           faultline
-Version:        0.1.0
+Version:        0.1.1
 Release:        1%{?dist}
 Summary:        Local-first Linux crash diagnosis and system forensics
 License:        MIT
@@ -54,5 +54,6 @@ python3 -m compileall -q faultline tests demo/native
 %{_userunitdir}/faultline-sampler.service
 
 %changelog
-* Thu Nov 12 2026 Sakib Shahariar <74959773+SakibShahariar@users.noreply.github.com> - 0.1.0-1
-- Add Fedora RPM packaging for Faultline
+* Thu Nov 12 2026 Sakib Shahariar <74959773+SakibShahariar@users.noreply.github.com> - 0.1.1-1
+- Align Fedora package metadata with the v0.1.1 release
+- Retain the native GTK application and user service assets
