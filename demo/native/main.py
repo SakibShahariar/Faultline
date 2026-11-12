@@ -403,6 +403,7 @@ class FaultlineWindow(Adw.ApplicationWindow):
             ("Application coredumps", "coredumpctl", "Not checked"),
             ("Kernel messages", "journal", "Collected through journal"),
             ("pstore", "pstore", "Not implemented"),
+            ("GNOME extension inventory", "gnome-extensions", "Not available on this desktop"),
             ("Resource sampler", "sampler", "Not enabled"),
         ]:
             status = SOURCE_STATUS.get(source)
@@ -420,6 +421,16 @@ class FaultlineWindow(Adw.ApplicationWindow):
         page = self.add_page("extensions", "Extensions")
         group = self.group(page, "GNOME Shell extensions",
                            "Extension activity can be correlated with incidents, but timing alone is not proof.")
+        extension_status = SOURCE_STATUS.get("gnome-extensions")
+        if extension_status:
+            self.action_row(
+                group, "Enabled extension inventory",
+                extension_status["detail"] + " · checked " + extension_status["checked_at"],
+                self.status_label(
+                    "Available" if extension_status["available"] else "Unavailable",
+                    "success" if extension_status["available"] else "warning",
+                ),
+            )
         extension_incidents = [
             incident for incident in INCIDENTS
             if incident["category"] == "extension-error"
