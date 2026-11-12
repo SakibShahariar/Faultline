@@ -23,8 +23,8 @@ script:
       "$TARGET_APPDIR/usr/share/icons/hicolor/scalable/apps/io.github.sakibshahariar.Faultline.svg"
     install -D -m 0644 "$SOURCE_ROOT/packaging/appimage/io.github.sakibshahariar.Faultline.desktop" \
       "$TARGET_APPDIR/usr/share/applications/io.github.sakibshahariar.Faultline.desktop"
-    install -D -m 0755 "$SOURCE_ROOT/packaging/appimage/faultline-app" \
-      "$TARGET_APPDIR/usr/bin/faultline-app"
+    install -D -m 0644 "$SOURCE_ROOT/packaging/appimage/launch.py" \
+      "$TARGET_APPDIR/usr/share/faultline/launch.py"
     install -d "$TARGET_APPDIR/usr/share/faultline/systemd/user"
     cp -a "$SOURCE_ROOT/data/systemd/user/." \
       "$TARGET_APPDIR/usr/share/faultline/systemd/user/"
