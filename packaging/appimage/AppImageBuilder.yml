@@ -15,8 +15,6 @@ script:
       "$TARGET_APPDIR/usr/share/faultline/demo/native/main.py"
     install -D -m 0644 "$SOURCE_ROOT/LICENSE" \
       "$TARGET_APPDIR/usr/share/licenses/faultline/LICENSE"
-    install -D -m 0644 "$SOURCE_ROOT/README.md" \
-      "$TARGET_APPDIR/usr/share/doc/faultline/README.md"
     install -D -m 0644 "$SOURCE_ROOT/data/metainfo/io.github.sakibshahariar.Faultline.metainfo.xml" \
       "$TARGET_APPDIR/usr/share/metainfo/io.github.sakibshahariar.Faultline.metainfo.xml"
     install -D -m 0644 "$SOURCE_ROOT/data/icons/hicolor/scalable/apps/io.github.sakibshahariar.Faultline.svg" \
@@ -70,7 +68,6 @@ AppDir:
       - libwayland-client0
       - libwayland-cursor0
       - libwayland-egl1
-      - libwayland-server0
       - libxkbcommon0
       - libxkbcommon-x11-0
       - libegl1

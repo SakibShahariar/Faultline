@@ -21,7 +21,7 @@ Download the build tools:
 
 ```sh
 curl -fL https://github.com/AppImageCrafters/appimage-builder/releases/download/v1.1.0/appimage-builder-1.1.0-x86_64.AppImage -o appimage-builder
-curl -fL https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -o appimagetool
+curl -fL https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage -o appimagetool
 chmod +x appimage-builder appimagetool
 export PATH="$PWD:$PATH"
 ```
@@ -112,3 +112,52 @@ done
 The first run is the first process launch in that test session, not a guaranteed
 cold disk-cache measurement. Compare the milestone timings as well as wall-clock
 time; the benchmark does not clear the operating system's page cache.
+
+
+## AppImage profiling and dependency inventory
+
+The CI workflow publishes a separate diagnostics artifact alongside the AppImage.
+It contains:
+
+- A JSON benchmark comparing the normal AppImage runtime, direct execution from
+  a persistent FUSE mount, and direct execution from an extracted AppDir.
+- GTK startup traces plus an optional dynamic-loader statistics log and
+  `strace` syscall summary.
+- A SquashFS superblock report and inventories of shared libraries, GI typelibs,
+  GSettings schemas, and desktop assets.
+
+Run the same diagnostics locally after building:
+
+```sh
+python3 packaging/appimage/diagnostics.py benchmark \
+  --appimage ./Faultline-0.1.2-x86_64.AppImage \
+  --output ./appimage-startup.json --runs 3
+
+python3 packaging/appimage/diagnostics.py profile \
+  --appimage ./Faultline-0.1.2-x86_64.AppImage \
+  --output ./appimage-profile
+
+python3 packaging/appimage/diagnostics.py inventory \
+  --appimage ./Faultline-0.1.2-x86_64.AppImage \
+  --output ./appimage-inventory
+```
+
+The benchmark requires `dbus-run-session` and `xvfb-run`. The profile command
+also requires `strace`. If FUSE mounting is unavailable, the benchmark records
+that limitation and falls back to the AppImage extraction mode; it does not
+pretend that extraction is a mounted-filesystem measurement.
+
+## Compression settings
+
+The build currently uses appimage-builder 1.1.0 and appimagetool 1.9.1. The AppDir recipe avoids bundling the Wayland server library because Faultline is a Wayland client, and it no longer copies a README file that the recipe's own documentation exclusion would remove. The
+builder's v1 recipe schema has no compression field and its appimagetool
+invocation does not pass a compression override. appimagetool 1.9.1 defaults
+to Zstandard and a 128 KB SquashFS block size; its bundled static
+`mksquashfs` is built with Zstandard support only. The 128 KB block size is
+deliberate: the upstream tool documents that a 1 MB block size caused higher
+startup times.
+
+Therefore, Faultline does not claim that an untested gzip/XZ switch improves
+startup. Any future compression experiment must use a separately validated
+toolchain and pass the clean offline, X11, and Wayland tests before replacing
+the default.
