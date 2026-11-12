@@ -123,9 +123,13 @@ def load_source_status():
     db = Database()
     try:
         return {
-            row["source"]: {"available": bool(row["available"]), "detail": row["detail"]}
+            row["source"]: {
+                "available": bool(row["available"]),
+                "detail": row["detail"],
+                "checked_at": row["checked_at"],
+            }
             for row in db.connection.execute(
-                "SELECT source, available, detail FROM source_status"
+                "SELECT source, available, detail, checked_at FROM source_status"
             ).fetchall()
         }
     finally:
