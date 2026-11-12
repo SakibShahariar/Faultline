@@ -33,6 +33,7 @@ The optional collector runs as the logged-in user without a privileged daemon.
 
 %install
 %pyproject_install
+%pyproject_save_files faultline
 
 %check
 python3 -m unittest discover -s tests -v
@@ -46,16 +47,3 @@ python3 -m compileall -q faultline tests demo/native
 %{_userunitdir}/faultline-collector.service
 %{_userunitdir}/faultline-collector.timer
 %{_userunitdir}/faultline-sampler.service
-
-%post
-%systemd_user_post faultline-collector.timer
-
-%preun
-%systemd_user_preun faultline-collector.timer
-
-%postun
-%systemd_user_postun_with_restart faultline-collector.timer
-
-%changelog
-* Thu Nov 12 2026 Faultline Maintainers <maintainers@example.invalid> - 0.1.0-1
-- Initial Fedora package
