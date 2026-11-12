@@ -5,7 +5,8 @@ After=default.target
 
 [Service]
 Type=oneshot
-ExecStart=%h/.local/bin/faultline scan --notify
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin
+ExecStart=/usr/bin/env faultline scan --notify
 Nice=10
 IOSchedulingClass=idle
 NoNewPrivileges=true
