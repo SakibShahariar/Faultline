@@ -1,95 +1,67 @@
 #!/usr/bin/env python3
-"""Faultline native libadwaita UI prototype.
+"""Faultline native GTK4/libadwaita application."""
+import sys
+import threading
+from pathlib import Path
 
-Run on a GNOME/Linux desktop with GTK4, libadwaita and PyGObject installed:
-    python3 demo/native/main.py
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
-All displayed records are fictional. This prototype does not inspect the host.
-"""
 import gi
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Adw, Gio, Gtk
+from gi.repository import Adw, Gio, GLib, Gtk
 
 
-INCIDENTS = [
-    {
-        "id": "FL-003",
-        "title": "Memory pressure detected",
-        "subtitle": "8 November 2026 · Previous boot",
-        "severity": "High",
-        "icon": "dialog-warning-symbolic",
-        "detail": (
-            "Memory pressure may have contributed to the system becoming "
-            "unresponsive. OOM-killer activity is confirmed, but the reason "
-            "the boot ended is not."
-        ),
-        "evidence": [
-            ("09:40:52", "Memory pressure increased",
-             "Available memory fell below the configured threshold."),
-            ("09:41:03", "OOM killer invoked",
-             "The kernel selected a process for termination."),
-            ("09:41:09", "Last journal activity",
-             "No clean shutdown sequence was found after this point."),
-            ("09:42:17", "Next boot recorded",
-             "The system returned without a matching clean shutdown record."),
-        ],
-        "causes": [
-            "Memory exhaustion from one or more processes",
-            "Workload exceeded available RAM and swap capacity",
-            "A separate freeze or power event after OOM activity",
-        ],
-    },
-    {
-        "id": "FL-002",
-        "title": "GNOME Shell restarted",
-        "subtitle": "2 November 2026 · Previous boot",
-        "severity": "Medium",
-        "icon": "preferences-desktop-display-symbolic",
-        "detail": (
-            "The GNOME Shell process exited and restarted during the session. "
-            "The available records do not establish what caused the exit."
-        ),
-        "evidence": [
-            ("18:16:02", "Shell process exited",
-             "The session journal recorded an unexpected process exit."),
-            ("18:16:04", "Shell restarted",
-             "The desktop session recovered."),
-            ("18:16:08", "Extension state recorded",
-             "Several extensions were enabled during the event."),
-        ],
-        "causes": [
-            "GNOME Shell or Mutter defect",
-            "Extension-triggered failure (not confirmed)",
-            "Graphics driver or compositor interaction",
-        ],
-    },
-    {
-        "id": "FL-001",
-        "title": "GNOME Software crashed",
-        "subtitle": "29 October 2026 · Current session",
-        "severity": "Low",
-        "icon": "application-x-executable-symbolic",
-        "detail": (
-            "GNOME Software terminated unexpectedly and left an application "
-            "coredump. This does not indicate a system-wide failure."
-        ),
-        "evidence": [
-            ("12:03:11", "Application started",
-             "GNOME Software launched in the user session."),
-            ("12:03:44", "Process terminated",
-             "The application exited unexpectedly."),
-            ("12:03:45", "Coredump recorded",
-             "A matching application coredump became available."),
-        ],
-        "causes": [
-            "Application defect",
-            "Library or plugin interaction",
-            "Transient application state",
-        ],
-    },
-]
+def load_incidents():
+    """Load only real findings from the local Faultline database."""
+    from faultline.storage import Database
+
+    db = Database()
+    try:
+        rows = db.connection.execute("""
+            SELECT f.id, f.boot_id, f.category, f.title, f.summary,
+                   f.confidence, b.boot_index, b.is_current, b.first_seen, b.last_seen
+            FROM findings AS f
+            LEFT JOIN boots AS b ON b.boot_id = f.boot_id
+            ORDER BY COALESCE(b.last_seen, f.created_at) DESC, f.id DESC
+        """).fetchall()
+        incidents = []
+        for row in rows:
+            events = db.connection.execute("""
+                SELECT timestamp, source, message FROM events
+                WHERE boot_id = ? ORDER BY timestamp LIMIT 200
+            """, (row["boot_id"],)).fetchall()
+            severity = "High" if row["category"] in ("kernel-panic", "storage-error") else (
+                "Medium" if row["confidence"] == "high" else "Low"
+            )
+            boot_label = "Current boot" if row["is_current"] else "Previous boot"
+            when = row["last_seen"] or row["first_seen"] or "Time unavailable"
+            incidents.append({
+                "id": f"FL-{row['id']:04d}",
+                "boot_id": row["boot_id"],
+                "category": row["category"],
+                "title": row["title"],
+                "subtitle": f"{when} · {boot_label}",
+                "severity": severity,
+                "icon": "dialog-warning-symbolic",
+                "detail": row["summary"],
+                "confidence": row["confidence"].title(),
+                "evidence": [
+                    (event["timestamp"], event["source"], event["message"])
+                    for event in events
+                ],
+                "causes": [],
+            })
+        return incidents
+    finally:
+        db.close()
+
+
+INCIDENTS = load_incidents()
+
 
 
 class FaultlineWindow(Adw.ApplicationWindow):
@@ -231,17 +203,22 @@ class FaultlineWindow(Adw.ApplicationWindow):
 
     def _build_pages(self):
         page = self.add_page("overview", "Overview")
-        group = self.group(page, "System status", "A summary of recent diagnostic activity.")
-        self.action_row(group, "System status", "No critical findings in the current sample data.",
-                        self.status_label("Stable", "success"))
-        self.action_row(group, "Incidents in the last 30 days", "One finding needs review.",
-                        Gtk.Label(label="3"))
-        self.action_row(group, "Current boot", "Started 8 November 2026 at 09:42.",
-                        Gtk.Label(label="2d 14h"))
-        self.action_row(group, "Last unexpected shutdown", "Cause has not been confirmed.",
-                        Gtk.Label(label="8 Nov"))
+        group = self.group(page, "System status", "Based on records collected from this device.")
+        self.action_row(group, "Diagnostic findings",
+                        f"{len(INCIDENTS)} findings stored" if INCIDENTS else "No findings yet. Run a scan to inspect available records.",
+                        self.status_label("Review" if INCIDENTS else "Not scanned",
+                                          "warning" if INCIDENTS else "dim-label"))
+        self.action_row(group, "Incident history", "Findings stored in the local database.",
+                        Gtk.Label(label=str(len(INCIDENTS))))
+        self.action_row(group, "Boot history", "Available after the first journal scan.",
+                        Gtk.Label(label="—"))
+        self.action_row(group, "Shutdown assessment", "Unknown until boot records have been collected.",
+                        Gtk.Label(label="—"))
 
         group = self.group(page, "Recent incidents")
+        if not INCIDENTS:
+            self.action_row(group, "No incidents recorded",
+                            "Run Scan to inspect accessible boot journals and coredump metadata.")
         for incident in INCIDENTS:
             self.action_row(
                 group, incident["title"], incident["subtitle"],
@@ -250,24 +227,26 @@ class FaultlineWindow(Adw.ApplicationWindow):
                 lambda _row, item=incident: self.show_incident(item),
             )
 
-        group = self.group(page, "Resource snapshot", "Illustrative values; no live monitoring is active.")
+        group = self.group(page, "Resource snapshot", "Resource sampling is not implemented yet.")
         for title, value, subtitle in [
-            ("Memory", "5.8 / 7.6 GiB", "76% used"),
-            ("Swap", "1.2 / 7.6 GiB", "16% used"),
-            ("CPU", "18%", "Current sample"),
-            ("Disk usage", "62%", "Root filesystem"),
+            ("Memory", "Not collected", "Optional sampler planned"),
+            ("Swap", "Not collected", "Optional sampler planned"),
+            ("CPU", "Not collected", "Optional sampler planned"),
+            ("Temperatures", "Not collected", "Hardware metrics are not queried"),
         ]:
             self.action_row(group, title, subtitle, Gtk.Label(label=value))
 
         group = self.group(page, "Needs attention")
-        self.action_row(
-            group, "Memory pressure before an unclean shutdown",
-            "OOM-killer activity appears shortly before the last recorded journal entry. "
-            "This may be related; the shutdown cause remains unknown.",
-            self.status_label("Review", "warning"),
-            "dialog-warning-symbolic",
-            lambda *_: self.show_incident(INCIDENTS[0]),
-        )
+        if INCIDENTS:
+            self.action_row(
+                group, INCIDENTS[0]["title"], INCIDENTS[0]["detail"],
+                self.status_label(INCIDENTS[0]["severity"], self.severity_style(INCIDENTS[0]["severity"])),
+                "dialog-warning-symbolic",
+                lambda *_: self.show_incident(INCIDENTS[0]),
+            )
+        else:
+            self.action_row(group, "Nothing to review yet",
+                            "Run a scan to discover available diagnostic evidence.")
 
         page = self.add_page("incidents", "Incidents")
         group = self.group(page, "Incident history", "Select an incident to inspect its evidence.")
@@ -280,32 +259,28 @@ class FaultlineWindow(Adw.ApplicationWindow):
             )
 
         page = self.add_page("health", "System health")
-        group = self.group(page, "Resource history", "Optional background sampling is not enabled in this UI prototype.")
+        group = self.group(page, "Resource history", "The optional background sampler has not been implemented.")
         for title, value, subtitle in [
-            ("Memory", "5.8 GiB", "of 7.6 GiB · 76% used"),
-            ("Swap", "1.2 GiB", "of 7.6 GiB · 16% used"),
-            ("CPU load", "18%", "Illustrative current sample"),
+            ("Memory", "No samples", "Resource sampling is not enabled"),
+            ("Swap", "No samples", "Resource sampling is not enabled"),
+            ("CPU load", "No samples", "Resource sampling is not enabled"),
         ]:
             self.action_row(group, title, subtitle, Gtk.Label(label=value))
         group = self.group(page, "Diagnostic sources", "Availability depends on system permissions and configuration.")
         for title, state, style in [
-            ("Previous boot journal", "Available", "success"),
-            ("Application coredumps", "Available", "success"),
-            ("Kernel messages", "Limited access", "warning"),
-            ("pstore", "Not detected", "dim-label"),
-            ("Resource sampler", "Disabled", "dim-label"),
+            ("Previous boot journal", "Checked during scan", "dim-label"),
+            ("Application coredumps", "Checked during scan", "dim-label"),
+            ("Kernel messages", "Via journal access", "dim-label"),
+            ("pstore", "Not implemented", "dim-label"),
+            ("Resource sampler", "Not implemented", "dim-label"),
         ]:
             self.action_row(group, title, suffix=self.status_label(state, style))
 
         page = self.add_page("extensions", "Extensions")
         group = self.group(page, "GNOME Shell extensions",
                            "Extension activity can be correlated with incidents, but timing alone is not proof.")
-        for title, subtitle, state in [
-            ("Blur my Shell", "Enabled during the Shell restart session.", "Review logs"),
-            ("Dash to Dock", "No matching error found in the sample.", "No signal"),
-            ("GSConnect", "No matching error found in the sample.", "No signal"),
-        ]:
-            self.action_row(group, title, subtitle, self.status_label(state, "warning" if state == "Review logs" else "dim-label"))
+        self.action_row(group, "Extension correlation not available",
+                        "GNOME Shell and extension log correlation is planned; no extension is identified as a suspect yet.")
 
         page = self.add_page("reports", "Reports")
         group = self.group(page, "Export diagnostics", "Reports are generated locally and should be reviewed before sharing.")
@@ -395,16 +370,16 @@ class FaultlineWindow(Adw.ApplicationWindow):
         group = self.group(page, "Assessment", incident["detail"])
         self.action_row(group, "Severity", suffix=self.status_label(
             incident["severity"], self.severity_style(incident["severity"])))
-        self.action_row(group, "Confidence", "Evidence supports the event classification; root cause may remain uncertain.")
+        self.action_row(group, "Confidence", incident.get("confidence", "Not assessed"))
+        self.action_row(group, "Boot ID", incident.get("boot_id", "Unavailable"))
 
-        group = self.group(page, "Evidence timeline")
-        for time, title, detail in incident["evidence"]:
-            self.action_row(group, time + "  ·  " + title, detail)
-
-        group = self.group(page, "Possible explanations",
-                           "These are hypotheses to investigate, not confirmed causes.")
-        for cause in incident["causes"]:
-            self.action_row(group, cause)
+        group = self.group(page, "Evidence timeline",
+                           "Original records collected from the system journal and coredump metadata.")
+        if incident["evidence"]:
+            for time, title, detail in incident["evidence"]:
+                self.action_row(group, time + "  ·  " + title, detail)
+        else:
+            self.action_row(group, "No linked records", "No matching raw event records are stored for this finding.")
 
         group = self.group(page, "Next steps")
         self.action_row(group, "Inspect related journal records",
@@ -421,7 +396,7 @@ class FaultlineWindow(Adw.ApplicationWindow):
     def scan_dialog(self, *_args):
         dialog = Adw.AlertDialog(
             heading="Scan diagnostic records?",
-            body="Faultline will inspect available boot journals, coredumps, and desktop logs. This prototype does not access your system.",
+            body="Faultline will read the boot journals and coredump metadata available to your user account. It will not request administrator privileges.",
         )
         dialog.add_response("cancel", "Cancel")
         dialog.add_response("scan", "Start Scan")
@@ -436,7 +411,34 @@ class FaultlineWindow(Adw.ApplicationWindow):
         except Exception:
             return
         if response == "scan":
-            self.toast("Scan is a UI prototype only.")
+            self.toast("Scanning available diagnostic sources…")
+            threading.Thread(target=self._run_scan, daemon=True).start()
+
+    def _run_scan(self):
+        try:
+            from faultline.collector import scan
+            result = scan()
+            error = None
+        except Exception as exc:
+            result = None
+            error = str(exc)
+        GLib.idle_add(self._scan_complete, result, error)
+
+    def _scan_complete(self, result, error):
+        global INCIDENTS
+        if error:
+            self.toast("Scan failed: " + error)
+            return GLib.SOURCE_REMOVE
+        INCIDENTS = load_incidents()
+        for page in list(self.pages.values()):
+            self.stack.remove(page)
+        self.pages = {}
+        self._build_pages()
+        if result and result["source_errors"]:
+            self.toast(f"Scan finished with {len(result['source_errors'])} source warning(s).")
+        else:
+            self.toast("Scan completed.")
+        return GLib.SOURCE_REMOVE
 
     def export_dialog(self):
         dialog = Adw.AlertDialog(
@@ -454,7 +456,7 @@ class FaultlineWindow(Adw.ApplicationWindow):
         except Exception:
             return
         if response == "create":
-            self.toast("Report export is not connected in this prototype.")
+            self.toast("Report export is not implemented yet.")
 
     def toast(self, message):
         self.toast_overlay.add_toast(Adw.Toast.new(message))
