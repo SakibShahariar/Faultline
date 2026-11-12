@@ -1,0 +1,79 @@
+# AppImageBuilder recipe for Faultline.
+# Build on Ubuntu 22.04 (glibc 2.35) to keep the host ABI baseline conservative.
+# Run from the repository root with APP_VERSION set, for example:
+#   APP_VERSION=0.1.0 appimage-builder --recipe packaging/appimage/AppImageBuilder.yml
+
+script:
+  - |
+    set -eu
+    SOURCE_ROOT="$(cd "$SOURCE_DIR/../.." && pwd)"
+    install -d "$TARGET_APPDIR/usr/share/faultline"
+    cp -a "$SOURCE_ROOT/faultline" "$TARGET_APPDIR/usr/share/faultline/"
+    install -D -m 0644 "$SOURCE_ROOT/demo/native/main.py" \
+      "$TARGET_APPDIR/usr/share/faultline/demo/native/main.py"
+    install -D -m 0644 "$SOURCE_ROOT/LICENSE" \
+      "$TARGET_APPDIR/usr/share/licenses/faultline/LICENSE"
+    install -D -m 0644 "$SOURCE_ROOT/README.md" \
+      "$TARGET_APPDIR/usr/share/doc/faultline/README.md"
+    install -D -m 0644 "$SOURCE_ROOT/data/metainfo/io.github.sakibshahariar.Faultline.metainfo.xml" \
+      "$TARGET_APPDIR/usr/share/metainfo/io.github.sakibshahariar.Faultline.metainfo.xml"
+    install -D -m 0644 "$SOURCE_ROOT/data/icons/hicolor/scalable/apps/io.github.sakibshahariar.Faultline.svg" \
+      "$TARGET_APPDIR/usr/share/icons/hicolor/scalable/apps/io.github.sakibshahariar.Faultline.svg"
+    install -D -m 0644 "$SOURCE_ROOT/packaging/appimage/io.github.sakibshahariar.Faultline.desktop" \
+      "$TARGET_APPDIR/usr/share/applications/io.github.sakibshahariar.Faultline.desktop"
+    install -D -m 0755 "$SOURCE_ROOT/packaging/appimage/faultline-app" \
+      "$TARGET_APPDIR/usr/bin/faultline-app"
+    install -d "$TARGET_APPDIR/usr/share/faultline/systemd/user"
+    cp -a "$SOURCE_ROOT/data/systemd/user/." \
+      "$TARGET_APPDIR/usr/share/faultline/systemd/user/"
+
+AppDir:
+  path: AppDir
+  app_info:
+    id: io.github.sakibshahariar.Faultline
+    name: Faultline
+    icon: io.github.sakibshahariar.Faultline
+    version: "{{APP_VERSION}}"
+    exec: usr/bin/faultline-app
+    exec_args: $@
+  apt:
+    arch: [amd64]
+    sources:
+      - sourceline: "deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy main universe"
+        key_url: "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x871920D1991BC93C"
+      - sourceline: "deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ jammy-updates main universe"
+        key_url: "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x871920D1991BC93C"
+      - sourceline: "deb [arch=amd64] http://security.ubuntu.com/ubuntu/ jammy-security main universe"
+        key_url: "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x871920D1991BC93C"
+    include:
+      - python3
+      - python3-gi
+      - gir1.2-gtk-4.0
+      - gir1.2-adw-1
+      - adwaita-icon-theme
+      - hicolor-icon-theme
+      - gsettings-desktop-schemas
+      - dconf-gsettings-backend
+      - shared-mime-info
+    exclude:
+      - humanity-icon-theme
+      - ubuntu-mono
+  runtime:
+    arch: [x86_64]
+    version: continuous
+    env:
+      PYTHONHOME: "${APPDIR}/usr"
+      PYTHONPATH: "${APPDIR}/usr/share/faultline"
+      PYTHONNOUSERSITE: "1"
+      GI_TYPELIB_PATH: "${APPDIR}/usr/lib/x86_64-linux-gnu/girepository-1.0"
+      GSETTINGS_SCHEMA_DIR: "${APPDIR}/usr/share/glib-2.0/schemas"
+  files:
+    exclude:
+      - usr/share/doc/*/README.*
+      - usr/share/doc/*/changelog.*
+      - usr/share/doc/*/NEWS.*
+      - usr/share/man
+
+AppImage:
+  arch: x86_64
+  file_name: "Faultline-{{APP_VERSION}}-x86_64.AppImage"
