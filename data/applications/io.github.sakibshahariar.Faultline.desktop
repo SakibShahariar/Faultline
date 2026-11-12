@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Faultline
+Comment=Diagnose Linux crashes and inspect system failure evidence
+Exec=faultline-gui
+Icon=io.github.sakibshahariar.Faultline
+Terminal=false
+Categories=System;Utility;GTK;
+StartupNotify=true
+DBusActivatable=true
+Keywords=crash;diagnostics;journal;kernel;systemd;forensics;
