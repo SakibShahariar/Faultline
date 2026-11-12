@@ -30,6 +30,8 @@ class JournalParserTests(unittest.TestCase):
         self.assertEqual(len(boots), 2)
         self.assertFalse(boots[0].current)
         self.assertTrue(boots[1].current)
+        self.assertEqual(boots[0].first_seen, "Mon 2026-11-10 08:00:00")
+        self.assertEqual(boots[0].last_seen, "Mon 2026-11-10 09:00:00")
 
     def test_parses_journal_json(self):
         row = {"MESSAGE": "Out of memory: Killed process 42", "__REALTIME_TIMESTAMP": "1000000",
