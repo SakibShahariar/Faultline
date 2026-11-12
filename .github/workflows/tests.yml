@@ -141,8 +141,8 @@ jobs:
           test -n "$rpm_file"
           mkdir -p dist
           cp "$rpm_file" "dist/Faultline-$APP_VERSION-1.fc45.noarch.rpm"
-          sha256sum "dist/Faultline-$APP_VERSION-1.fc45.noarch.rpm" \
-            | tee "dist/Faultline-$APP_VERSION-1.fc45.noarch.rpm.sha256"
+          (cd dist && sha256sum "Faultline-$APP_VERSION-1.fc45.noarch.rpm" \
+            > "Faultline-$APP_VERSION-1.fc45.noarch.rpm.sha256")
       - name: Upload Fedora RPM and checksum
         uses: actions/upload-artifact@v4
         with:
