@@ -62,6 +62,20 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(before, after)
         self.assertTrue(result["source_errors"])
 
+    def test_missing_journal_is_reported_without_crashing(self):
+        with patch(
+            "faultline.collector.list_boots",
+            side_effect=SourceError("journal is not readable"),
+        ):
+            result = scan(self.db)
+        self.assertEqual(result["boots_seen"], 0)
+        self.assertEqual(result["source_errors"][0]["source"], "journal")
+        status = self.db.connection.execute(
+            "SELECT available, detail FROM source_status WHERE source = 'journal'"
+        ).fetchone()
+        self.assertFalse(status["available"])
+        self.assertIn("not readable", status["detail"])
+
     def test_optional_source_failure_preserves_its_findings(self):
         from faultline.models import Finding
 
