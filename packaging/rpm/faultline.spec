@@ -8,6 +8,7 @@ Source0:        %{url}/archive/refs/tags/v%{version}.tar.gz
 
 BuildArch:      noarch
 BuildRequires:  python3-devel
+BuildRequires:  pyproject-rpm-macros
 BuildRequires:  python3-setuptools
 BuildRequires:  python3-pip
 Requires:       python3
