@@ -54,14 +54,14 @@ def launch_command(target: Path, *, appimage: Path, direct_apprun: bool):
         "GTK_A11Y": "none",
         "GDK_BACKEND": "x11",
         "FAULTLINE_STARTUP_TRACE": "1",
-        "APPIMAGE": str(appimage),
-        "ARGV0": str(appimage),
-        "OWD": os.getcwd(),
     })
     if direct_apprun:
         appdir = target
         env.update({
             "APPDIR": str(appdir),
+            "APPIMAGE": str(appimage),
+            "ARGV0": str(appimage),
+            "OWD": os.getcwd(),
             "PYTHONHOME": str(appdir / "usr"),
             "PYTHONPATH": str(appdir / "usr" / "share" / "faultline"),
             "PYTHONNOUSERSITE": "1",
@@ -90,7 +90,10 @@ def launch_command(target: Path, *, appimage: Path, direct_apprun: bool):
             str(executable), "--smoke-test",
         ]
     else:
-        env.pop("APPDIR", None)
+        # Let the AppImage runtime establish APPIMAGE, APPDIR, ARGV0, and OWD.
+        for key in ("APPDIR", "APPIMAGE", "ARGV0", "OWD"):
+            env.pop(key, None)
+        env.pop("APPIMAGE_EXTRACT_AND_RUN", None)
         command = [
             "dbus-run-session", "--", "xvfb-run", "-a",
             str(appimage), "--smoke-test",
@@ -167,7 +170,7 @@ def benchmark(args):
         "notes": [
             "First trial is not a guaranteed cold page-cache measurement.",
             "All modes run the same GUI smoke test under Xvfb and a private D-Bus session.",
-            "Direct AppRun modes isolate filesystem access from the AppImage runtime launcher.",
+            "Direct packaged-launcher modes use the same bundle environment while bypassing the AppImage runtime launcher.",
         ],
     }
 
