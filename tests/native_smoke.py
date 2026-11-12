@@ -20,5 +20,17 @@ assert module.OPEN_INCIDENT_ID == "FL-0001"
 window = app.props.active_window
 assert window is not None, "Faultline did not create its main window"
 assert window.get_title() == "Faultline"
+window.show_incident({
+    "id": "FL-0001",
+    "title": "Smoke-test incident",
+    "severity": "Medium",
+    "detail": "Synthetic UI-only evidence used by the smoke test.",
+    "confidence": "Moderate",
+    "boot_id": "a" * 32,
+    "evidence": [("2026-11-12T09:30:00+00:00", "kernel", "Out of memory: Killed process 123")],
+    "evidence_count": 1,
+    "evidence_truncated": False,
+})
+assert window.stack.get_visible_child_name() == "incident-detail"
 window.close()
 app.quit()
