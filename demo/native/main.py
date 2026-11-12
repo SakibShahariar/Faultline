@@ -419,8 +419,17 @@ class FaultlineWindow(Adw.ApplicationWindow):
                            "The optional systemd user timer runs at login and every six hours after you enable it.")
         self.action_row(group, "Collector timer",
                         "Manage with systemctl --user enable --now faultline-collector.timer")
-        self.action_row(group, "Resource sampler",
-                        "Not implemented yet; no background CPU or memory sampling is active.")
+        sampler_row = Adw.SwitchRow()
+        sampler_row.set_title("Background resource sampling")
+        sampler_row.set_subtitle(
+            "Sample CPU, memory, swap, thermal sensors, and supported GPU load at the configured interval."
+        )
+        sampler_row.set_active(bool(settings["background_sampler"]))
+        self.sampler_switch_handler = sampler_row.connect(
+            "notify::active", self.on_sampler_switch
+        )
+        self.sampler_switch = sampler_row
+        group.add(sampler_row)
 
         group = self.group(page, "Storage and retention",
                            "Older boot records are pruned after a successful scan. Unknown timestamps are retained.")
@@ -442,6 +451,34 @@ class FaultlineWindow(Adw.ApplicationWindow):
         self.action_row(group, "Desktop notifications", "Not active in this version.")
 
         self.show_page("overview")
+
+    def on_sampler_switch(self, row, _property):
+        import subprocess
+        from faultline.settings import update_setting
+
+        enabled = row.get_active()
+        update_setting("background_sampler", enabled)
+        command = (
+            ["systemctl", "--user", "enable", "--now", "faultline-sampler.service"]
+            if enabled else
+            ["systemctl", "--user", "disable", "--now", "faultline-sampler.service"]
+        )
+        try:
+            result = subprocess.run(command, capture_output=True, text=True, timeout=15)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            result = None
+            detail = str(exc)
+        else:
+            detail = result.stderr.strip() or result.stdout.strip()
+        if result is None or result.returncode != 0:
+            update_setting("background_sampler", not enabled)
+            row.handler_block(self.sampler_switch_handler)
+            row.set_active(not enabled)
+            row.handler_unblock(self.sampler_switch_handler)
+            self.toast("Could not change sampler service. Install its user unit first. " + detail)
+            return
+        self.toast("Background resource sampling enabled." if enabled else
+                   "Background resource sampling disabled.")
 
     def on_setting_switch(self, row, _property, key):
         from faultline.settings import update_setting
