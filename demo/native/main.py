@@ -592,6 +592,36 @@ class FaultlineWindow(Adw.ApplicationWindow):
         else:
             self.action_row(group, "No linked records", "No matching raw event records are stored for this finding.")
 
+        from faultline.storage import Database
+        db = Database()
+        try:
+            samples = db.connection.execute("""
+                SELECT captured_at, cpu_percent, memory_used_bytes, memory_total_bytes,
+                       temperature_c, gpu_busy_percent
+                FROM samples WHERE boot_id = ? ORDER BY captured_at DESC LIMIT 5
+            """, (incident.get("boot_id"),)).fetchall()
+        finally:
+            db.close()
+        group = self.group(
+            page, "Resource context",
+            "Recent samples from this boot. They provide context, not proof of conditions at the exact crash moment."
+        )
+        if samples:
+            for sample in reversed(samples):
+                memory = self.format_sample_memory(
+                    sample["memory_used_bytes"], sample["memory_total_bytes"]
+                )
+                detail = (
+                    f"CPU {self.format_percent(sample['cpu_percent'])} · "
+                    f"Memory {memory} · "
+                    f"Temperature {self.format_temperature(sample['temperature_c'])} · "
+                    f"GPU {self.format_percent(sample['gpu_busy_percent'])}"
+                )
+                self.action_row(group, sample["captured_at"], detail)
+        else:
+            self.action_row(group, "No samples for this boot",
+                            "Enable optional background sampling to collect resource history.")
+
         group = self.group(page, "Next steps")
         self.action_row(group, "Inspect related journal records",
                         "Review the original records around the incident timestamp.")
