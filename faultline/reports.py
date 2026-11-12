@@ -59,7 +59,8 @@ def build_report(db: Database, boot_id: str | None = None, redact: bool = True) 
             FROM events WHERE boot_id = ? ORDER BY timestamp
         """, (boot["boot_id"],)).fetchall()
         findings = db.connection.execute("""
-            SELECT category, title, summary, confidence, evidence_json
+            SELECT category, title, summary, confidence, evidence_json,
+                   contradicting_evidence_json
             FROM findings WHERE boot_id = ? ORDER BY id
         """, (boot["boot_id"],)).fetchall()
         samples = db.connection.execute("""
@@ -82,6 +83,7 @@ def build_report(db: Database, boot_id: str | None = None, redact: bool = True) 
                     "summary": row["summary"],
                     "confidence": row["confidence"],
                     "evidence": json.loads(row["evidence_json"]),
+                    "contradicting_evidence": json.loads(row["contradicting_evidence_json"]),
                 }
                 for row in findings
             ],
@@ -163,7 +165,11 @@ def render_markdown(report: dict) -> str:
                 "",
             ])
             for evidence in finding["evidence"]:
-                lines.append(f"- Evidence: {evidence}")
+                lines.append(f"- Supporting evidence: {evidence}")
+            for evidence in finding.get("contradicting_evidence", []):
+                lines.append(f"- Counter-evidence: {evidence}")
+            if not finding.get("contradicting_evidence"):
+                lines.append("- Counter-evidence: none explicitly recorded in collected sources")
         lines.extend(["", "### Resource samples", ""])
         if not boot["samples"]:
             lines.append("No resource samples were recorded for this boot.")
