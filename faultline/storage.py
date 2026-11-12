@@ -1,0 +1,135 @@
+"""Local SQLite storage with explicit schema versioning."""
+from __future__ import annotations
+
+import json
+import os
+import sqlite3
+from pathlib import Path
+from typing import Iterable
+
+from .models import Boot, Event, Finding
+
+SCHEMA_VERSION = 1
+
+
+def default_database_path() -> Path:
+    data_home = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
+    return data_home / "faultline" / "crashes.db"
+
+
+class Database:
+    def __init__(self, path: str | Path | None = None):
+        self.path = Path(path) if path else default_database_path()
+        self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        try:
+            self.path.parent.chmod(0o700)
+        except OSError:
+            pass
+        self.connection = sqlite3.connect(self.path)
+        self.connection.row_factory = sqlite3.Row
+        self.connection.execute("PRAGMA foreign_keys = ON")
+        self.connection.execute("PRAGMA journal_mode = WAL")
+        self._migrate()
+        try:
+            self.path.chmod(0o600)
+        except OSError:
+            pass
+
+    def _migrate(self) -> None:
+        version = self.connection.execute("PRAGMA user_version").fetchone()[0]
+        if version > SCHEMA_VERSION:
+            raise RuntimeError(f"Database schema {version} is newer than supported {SCHEMA_VERSION}")
+        if version < 1:
+            with self.connection:
+                self.connection.executescript("""
+                    CREATE TABLE boots (
+                        boot_id TEXT PRIMARY KEY,
+                        first_seen TEXT,
+                        last_seen TEXT,
+                        boot_index INTEGER,
+                        is_current INTEGER NOT NULL DEFAULT 0,
+                        shutdown_status TEXT NOT NULL DEFAULT 'unknown'
+                    );
+                    CREATE TABLE events (
+                        id INTEGER PRIMARY KEY,
+                        boot_id TEXT NOT NULL,
+                        timestamp TEXT NOT NULL,
+                        source TEXT NOT NULL,
+                        unit TEXT,
+                        priority INTEGER,
+                        event_type TEXT NOT NULL,
+                        message TEXT NOT NULL,
+                        signature TEXT NOT NULL,
+                        metadata_json TEXT NOT NULL DEFAULT '{}',
+                        FOREIGN KEY (boot_id) REFERENCES boots(boot_id) ON DELETE CASCADE
+                    );
+                    CREATE INDEX events_boot_time ON events(boot_id, timestamp);
+                    CREATE INDEX events_signature ON events(signature);
+                    CREATE TABLE findings (
+                        id INTEGER PRIMARY KEY,
+                        boot_id TEXT NOT NULL,
+                        category TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        summary TEXT NOT NULL,
+                        confidence TEXT NOT NULL,
+                        evidence_json TEXT NOT NULL DEFAULT '[]',
+                        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (boot_id) REFERENCES boots(boot_id) ON DELETE CASCADE
+                    );
+                    CREATE TABLE source_status (
+                        source TEXT PRIMARY KEY,
+                        available INTEGER NOT NULL,
+                        detail TEXT NOT NULL,
+                        checked_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    );
+                    PRAGMA user_version = 1;
+                """)
+
+    def upsert_boot(self, boot: Boot) -> None:
+        with self.connection:
+            self.connection.execute("""
+                INSERT INTO boots(boot_id, first_seen, last_seen, boot_index, is_current, shutdown_status)
+                VALUES(?,?,?,?,?,?)
+                ON CONFLICT(boot_id) DO UPDATE SET
+                  first_seen=excluded.first_seen, last_seen=excluded.last_seen,
+                  boot_index=excluded.boot_index, is_current=excluded.is_current,
+                  shutdown_status=excluded.shutdown_status
+            """, (boot.boot_id, boot.first_seen, boot.last_seen, boot.index,
+                  int(boot.current), boot.shutdown_status))
+
+    def add_events(self, events: Iterable[Event]) -> int:
+        rows = [(e.boot_id, e.timestamp, e.source, e.unit, e.priority, e.event_type,
+                 e.message, e.signature, json.dumps(e.metadata, sort_keys=True))
+                for e in events]
+        with self.connection:
+            before = self.connection.total_changes
+            self.connection.executemany("""
+                INSERT INTO events(boot_id,timestamp,source,unit,priority,event_type,message,signature,metadata_json)
+                SELECT ?,?,?,?,?,?,?,?,?
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM events
+                    WHERE boot_id=? AND timestamp=? AND source=? AND signature=?
+                )
+            """, [r + (r[0], r[1], r[2], r[7]) for r in rows])
+            return self.connection.total_changes - before
+
+    def add_findings(self, boot_id: str, findings: Iterable[Finding]) -> None:
+        with self.connection:
+            self.connection.executemany("""
+                INSERT INTO findings(boot_id,category,title,summary,confidence,evidence_json)
+                VALUES(?,?,?,?,?,?)
+            """, [(boot_id, f.category, f.title, f.summary, f.confidence,
+                   json.dumps(f.evidence)) for f in findings])
+
+    def set_source_status(self, source: str, available: bool, detail: str) -> None:
+        with self.connection:
+            self.connection.execute("""
+                INSERT INTO source_status(source,available,detail,checked_at)
+                VALUES(?,?,?,CURRENT_TIMESTAMP)
+                ON CONFLICT(source) DO UPDATE SET
+                  available=excluded.available, detail=excluded.detail,
+                  checked_at=CURRENT_TIMESTAMP
+            """, (source, int(available), detail))
+
+    def close(self) -> None:
+        self.connection.close()
