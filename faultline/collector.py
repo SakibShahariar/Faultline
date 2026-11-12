@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from .coredumps import list_coredump_events
 from .diagnostics import classify
+from .extensions import correlate_extension_events, list_enabled_extensions
 from .models import Event, Finding
 from .pstore import read_pstore
 from .shutdown import assess_shutdown
@@ -49,6 +50,17 @@ def scan(database: Database | None = None) -> dict:
             db.set_source_status("coredumpctl", False, str(exc))
             summary["source_errors"].append({"source": "coredumpctl", "error": str(exc)})
 
+        enabled_extensions: set[str] = set()
+        try:
+            enabled_extensions = list_enabled_extensions()
+            db.set_source_status(
+                "gnome-extensions", True,
+                f"{len(enabled_extensions)} enabled extension(s) discovered"
+            )
+        except SourceError as exc:
+            db.set_source_status("gnome-extensions", False, str(exc))
+            summary["source_errors"].append({"source": "gnome-extensions", "error": str(exc)})
+
         previous_boot = next((boot for boot in boots if boot.index == -1), None)
         pstore_by_boot: dict[str, list[Event]] = {}
         if previous_boot:
@@ -65,6 +77,7 @@ def scan(database: Database | None = None) -> dict:
         for boot in boots:
             db.upsert_boot(boot)
             findings_by_category: dict[str, Finding] = {}
+            extension_findings: dict[str, Finding] = {}
             shutdown_evidence: list[Event] = []
             batch: list[Event] = []
             journal_ok = True
@@ -80,12 +93,32 @@ def scan(database: Database | None = None) -> dict:
                         shutdown_evidence.append(event)
                     batch.append(event)
                     if len(batch) >= BATCH_SIZE:
-                        summary["events_added"] += db.add_events(batch)
-                        _merge_findings(findings_by_category, batch)
+                        correlated_events, correlated_findings = correlate_extension_events(
+                            batch, enabled_extensions
+                        )
+                        summary["events_added"] += db.add_events(correlated_events)
+                        _merge_findings(findings_by_category, correlated_events)
+                        for finding in correlated_findings:
+                            current = extension_findings.get(finding.title)
+                            if current is None:
+                                extension_findings[finding.title] = finding
+                            else:
+                                current.evidence.extend(finding.evidence)
+                                current.evidence = current.evidence[:20]
                         batch.clear()
                 if batch:
-                    summary["events_added"] += db.add_events(batch)
-                    _merge_findings(findings_by_category, batch)
+                    correlated_events, correlated_findings = correlate_extension_events(
+                        batch, enabled_extensions
+                    )
+                    summary["events_added"] += db.add_events(correlated_events)
+                    _merge_findings(findings_by_category, correlated_events)
+                    for finding in correlated_findings:
+                        current = extension_findings.get(finding.title)
+                        if current is None:
+                            extension_findings[finding.title] = finding
+                        else:
+                            current.evidence.extend(finding.evidence)
+                            current.evidence = current.evidence[:20]
                     batch.clear()
             except SourceError as exc:
                 journal_ok = False
@@ -109,7 +142,7 @@ def scan(database: Database | None = None) -> dict:
 
             boot.shutdown_status = assess_shutdown(shutdown_evidence, current=boot.current)
             db.upsert_boot(boot)
-            findings = list(findings_by_category.values())
+            findings = list(findings_by_category.values()) + list(extension_findings.values())
             db.add_findings(boot.boot_id, findings)
             summary["findings"] += len(findings)
         return summary
