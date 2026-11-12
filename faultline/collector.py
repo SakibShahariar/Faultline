@@ -6,6 +6,7 @@ from .diagnostics import classify
 from .extensions import correlate_extension_events, list_enabled_extensions
 from .models import Event, Finding
 from .pstore import read_pstore
+from .settings import load_settings
 from .shutdown import assess_shutdown
 from .sources import SourceError, iter_boot_events, list_boots
 from .storage import Database
@@ -30,10 +31,11 @@ def scan(database: Database | None = None) -> dict:
     summary = {"boots_seen": 0, "events_added": 0, "coredumps_seen": 0,
                "findings": 0, "source_errors": []}
     try:
+        settings = load_settings()
         try:
             boots = list_boots()
             # Keep periodic scans bounded; older records remain available in SQLite.
-            boots = boots[-10:]
+            boots = boots[-settings["max_boots_per_scan"]:]
             db.set_source_status("journal", True, "systemd journal is readable")
         except SourceError as exc:
             db.set_source_status("journal", False, str(exc))
@@ -42,30 +44,38 @@ def scan(database: Database | None = None) -> dict:
 
         summary["boots_seen"] = len(boots)
         coredumps_by_boot: dict[str, list[Event]] = {}
-        try:
-            coredumps = list_coredump_events()
-            for event in coredumps:
-                coredumps_by_boot.setdefault(event.boot_id, []).append(event)
-            summary["coredumps_seen"] = len(coredumps)
-            db.set_source_status("coredumpctl", True, f"{len(coredumps)} metadata records read")
-        except SourceError as exc:
-            db.set_source_status("coredumpctl", False, str(exc))
-            summary["source_errors"].append({"source": "coredumpctl", "error": str(exc)})
+        if settings["collect_coredumps"]:
+            try:
+                coredumps = list_coredump_events()
+                for event in coredumps:
+                    coredumps_by_boot.setdefault(event.boot_id, []).append(event)
+                summary["coredumps_seen"] = len(coredumps)
+                db.set_source_status("coredumpctl", True, f"{len(coredumps)} metadata records read")
+            except SourceError as exc:
+                db.set_source_status("coredumpctl", False, str(exc))
+                summary["source_errors"].append({"source": "coredumpctl", "error": str(exc)})
+        else:
+            db.set_source_status("coredumpctl", False, "Disabled in Faultline settings")
 
         enabled_extensions: set[str] = set()
-        try:
-            enabled_extensions = list_enabled_extensions()
-            db.set_source_status(
-                "gnome-extensions", True,
-                f"{len(enabled_extensions)} enabled extension(s) discovered"
-            )
-        except SourceError as exc:
-            db.set_source_status("gnome-extensions", False, str(exc))
-            summary["source_errors"].append({"source": "gnome-extensions", "error": str(exc)})
+        if settings["correlate_extensions"]:
+            try:
+                enabled_extensions = list_enabled_extensions()
+                db.set_source_status(
+                    "gnome-extensions", True,
+                    f"{len(enabled_extensions)} enabled extension(s) discovered"
+                )
+            except SourceError as exc:
+                db.set_source_status("gnome-extensions", False, str(exc))
+                summary["source_errors"].append({"source": "gnome-extensions", "error": str(exc)})
+        else:
+            db.set_source_status("gnome-extensions", False, "Disabled in Faultline settings")
 
         previous_boot = next((boot for boot in boots if boot.index == -1), None)
         pstore_by_boot: dict[str, list[Event]] = {}
-        if previous_boot:
+        if not settings["collect_pstore"]:
+            db.set_source_status("pstore", False, "Disabled in Faultline settings")
+        elif previous_boot:
             pstore_events = read_pstore(previous_boot.boot_id)
             pstore_by_boot[previous_boot.boot_id] = pstore_events
             db.set_source_status(
