@@ -249,6 +249,9 @@ class FaultlineWindow(Adw.ApplicationWindow):
         return label
 
     def _build_pages(self):
+        from faultline.settings import load_settings
+        settings = load_settings()
+
         page = self.add_page("overview", "Overview")
         group = self.group(page, "System status", "Based on records collected from this device.")
         self.action_row(group, "Diagnostic findings",
@@ -357,47 +360,65 @@ class FaultlineWindow(Adw.ApplicationWindow):
                         self.status_label("Review before sharing", "warning"))
 
         page = self.add_page("preferences", "Preferences")
-        group = self.group(page, "Collection", "Collection currently runs only when you press Scan. Automatic startup scans and background monitoring are planned.")
-        row = Adw.ActionRow()
-        row.set_title("Automatic startup scan")
-        row.set_subtitle("Not implemented yet")
-        group.add(row)
-        row = Adw.ActionRow()
-        row.set_title("Background resource monitoring")
-        row.set_subtitle("Not implemented yet")
-        group.add(row)
-        row = Adw.ActionRow()
-        row.set_title("GNOME extension correlation")
-        row.set_subtitle("Not implemented yet")
-        group.add(row)
-
-        group = self.group(page, "Privacy", "Diagnostic data stays on this device unless you export it.")
-        for title, subtitle, enabled in [
-            ("Redact home directory paths", "Replace personal paths in generated reports.", True),
-            ("Include application logs in reports", "Application logs may contain private information.", False),
+        group = self.group(page, "Diagnostic sources",
+                           "Choose which optional sources Faultline reads during a scan.")
+        for title, subtitle, key in [
+            ("Application coredump metadata", "Read systemd-coredump metadata; core files are never copied.", "collect_coredumps"),
+            ("Retained kernel crash records", "Read bounded text records from pstore when accessible.", "collect_pstore"),
+            ("GNOME extension error correlation", "Match explicit error paths against enabled extension IDs.", "correlate_extensions"),
         ]:
             row = Adw.SwitchRow()
             row.set_title(title)
             row.set_subtitle(subtitle)
-            row.set_active(enabled)
+            row.set_active(bool(settings[key]))
+            row.connect("notify::active", self.on_setting_switch, key)
             group.add(row)
 
-        group = self.group(page, "Notifications")
-        for title, subtitle, enabled in [
-            ("Notify about new incidents", "Show a desktop notification after a new finding.", True),
-            ("Notify after unexpected shutdown", "Summarize findings after the next login.", True),
+        group = self.group(page, "Privacy",
+                           "Reports are generated locally. Redaction is enabled by default.")
+        row = Adw.SwitchRow()
+        row.set_title("Redact personal data in reports")
+        row.set_subtitle("Replace home paths, email addresses, IP addresses, MAC addresses, and bearer tokens.")
+        row.set_active(bool(settings["redact_reports"]))
+        row.connect("notify::active", self.on_setting_switch, "redact_reports")
+        group.add(row)
+
+        group = self.group(page, "Background collection",
+                           "The optional systemd user timer runs at login and every six hours after you enable it.")
+        self.action_row(group, "Collector timer",
+                        "Manage with systemctl --user enable --now faultline-collector.timer")
+        self.action_row(group, "Resource sampler",
+                        "Not implemented yet; no background CPU or memory sampling is active.")
+
+        group = self.group(page, "Storage and retention",
+                           "Older boot records are pruned after a successful scan. Unknown timestamps are retained.")
+        self.action_row(group, "Local database", str(__import__("pathlib").Path.home() / ".local/share/faultline/crashes.db"))
+        for title, key, minimum, maximum in [
+            ("History retention (days)", "retention_days", 1, 3650),
+            ("Maximum boots per scan", "max_boots_per_scan", 1, 100),
         ]:
-            row = Adw.SwitchRow()
+            row = Adw.ActionRow()
             row.set_title(title)
-            row.set_subtitle(subtitle)
-            row.set_active(enabled)
+            spin = Gtk.SpinButton.new_with_range(minimum, maximum, 1)
+            spin.set_value(settings[key])
+            spin.connect("value-changed", self.on_setting_number, key)
+            row.add_suffix(spin)
             group.add(row)
 
-        group = self.group(page, "Storage")
-        self.action_row(group, "Local database", "~/.local/share/faultline/crashes.db")
-        self.action_row(group, "Retention", "Keep diagnostic history for 90 days.")
+        group = self.group(page, "Notifications",
+                           "Next-login incident notifications are planned but are not implemented yet.")
+        self.action_row(group, "Desktop notifications", "Not active in this version.")
 
         self.show_page("overview")
+
+    def on_setting_switch(self, row, _property, key):
+        from faultline.settings import update_setting
+        update_setting(key, row.get_active())
+        self.toast("Preference saved.")
+
+    def on_setting_number(self, spin, key):
+        from faultline.settings import update_setting
+        update_setting(key, spin.get_value_as_int())
 
     @staticmethod
     def severity_style(severity):
@@ -513,11 +534,13 @@ class FaultlineWindow(Adw.ApplicationWindow):
 
     def export_dialog(self):
         from faultline.reports import build_report
+        from faultline.settings import load_settings
         from faultline.storage import Database
 
+        settings = load_settings()
         db = Database()
         try:
-            report = build_report(db, redact=True)
+            report = build_report(db, redact=settings["redact_reports"])
         finally:
             db.close()
         boot_count = len(report["boots"])
@@ -528,9 +551,9 @@ class FaultlineWindow(Adw.ApplicationWindow):
             body=(
                 f"Preview: {boot_count} boot(s), {finding_count} finding(s), "
                 f"and {event_count} event record(s).\n\n"
-                "Home paths, email addresses, IP addresses, MAC addresses, and bearer "
-                "tokens are redacted by default. The report stays on this device; "
-                "review the saved file before sharing it."
+                + ("Personal data redaction is enabled. " if settings["redact_reports"] else
+                   "Warning: personal data redaction is disabled. ")
+                + "The report stays on this device; review the saved file before sharing it."
             ),
         )
         dialog.add_response("cancel", "Cancel")
@@ -569,11 +592,13 @@ class FaultlineWindow(Adw.ApplicationWindow):
             return
         try:
             from faultline.reports import build_report, write_report
+            from faultline.settings import load_settings
             from faultline.storage import Database
 
+            settings = load_settings()
             db = Database()
             try:
-                report = build_report(db, redact=True)
+                report = build_report(db, redact=settings["redact_reports"])
             finally:
                 db.close()
             write_report(path, report, report_format)
