@@ -178,7 +178,6 @@ class FaultlineWindow(Adw.ApplicationWindow):
         """Read database-backed view models away from the GTK main thread."""
         self.data_loading = True
         self.data_error = None
-
         def load():
             from faultline.presentation import load_boot_summary, load_incidents, load_source_status
             from faultline.recurrence import find_recurring_events
@@ -289,103 +288,11 @@ class FaultlineWindow(Adw.ApplicationWindow):
         recurring_events = self.recurring_events
         latest_sample = self.latest_sample
 
-        page = self.add_page("overview", "Overview")
-        group = self.group(page, "System status", "Based on records collected from this device.")
-        finding_summary = (
-            "Loading local diagnostic history…" if self.data_loading else
-            (f"{len(INCIDENTS)} findings stored" if INCIDENTS else
-             ("Could not load local history." if self.data_error else
-              "No findings yet. Run a scan to inspect available records."))
-        )
-        finding_state = (
-            "Loading" if self.data_loading else
-            ("Error" if self.data_error else ("Review" if INCIDENTS else "Not scanned"))
-        )
-        self.action_row(group, "Diagnostic findings", finding_summary,
-                        self.status_label(finding_state,
-                                          "warning" if INCIDENTS or self.data_error else "dim-label"))
-        self.action_row(group, "Incident history", "Findings stored in the local database.",
-                        Gtk.Label(label=str(len(INCIDENTS))))
-        self.action_row(group, "Boot history", "Boot records collected from systemd journal.",
-                        Gtk.Label(label=str(BOOT_SUMMARY["count"])))
-        previous_status = BOOT_SUMMARY["previous_status"] or "not assessed"
-        self.action_row(group, "Previous boot ending", "Evidence-based shutdown assessment.",
-                        Gtk.Label(label=previous_status.replace("_", " ").title()))
+        from faultline.overview import build_overview
 
-        group = self.group(page, "Recent incidents")
-        if not INCIDENTS:
-            if self.data_loading:
-                self.action_row(group, "Loading incidents", "Reading the local diagnostic database.")
-            elif self.data_error:
-                self.action_row(group, "Incident history unavailable", self.data_error)
-            else:
-                self.action_row(group, "No incidents recorded",
-                                "Run Scan to inspect accessible boot journals and coredump metadata.")
-        if not INCIDENTS:
-            if self.data_loading:
-                self.action_row(group, "Loading incident history", "Reading stored findings and evidence.")
-            elif self.data_error:
-                self.action_row(group, "Could not load incidents", self.data_error)
-            else:
-                self.action_row(group, "No incidents yet", "Run Scan to collect available diagnostic records.")
-        for incident in INCIDENTS:
-            self.action_row(
-                group, incident["title"], incident["subtitle"],
-                self.status_label(incident["severity"], self.severity_style(incident["severity"])),
-                incident["icon"],
-                lambda _row, item=incident: self.show_incident(item),
-            )
-
-        group = self.group(page, "Recurring patterns",
-                           "The same normalized event signature recorded across multiple boots.")
-        if recurring_events:
-            for item in recurring_events[:5]:
-                self.action_row(
-                    group,
-                    (item["sources"] or item["source"]) + " · " + str(item["boot_count"]) + " boots",
-                    item["example"],
-                    Gtk.Label(label=str(item["event_count"]) + " events"),
-                    callback=lambda *_args, recurrence=item: self.show_recurrence(recurrence),
-                )
-        else:
-            self.action_row(group, "No recurring signatures",
-                            "A pattern appears here after the same normalized event is recorded in at least two boots.")
-
-        group = self.group(
-            page, "Resource snapshot",
-            "Latest optional sample; unavailable hardware metrics remain blank."
-        )
-        if latest_sample:
-            memory = self.format_sample_memory(
-                latest_sample["memory_used_bytes"], latest_sample["memory_total_bytes"]
-            )
-            swap = self.format_sample_memory(
-                latest_sample["swap_used_bytes"], latest_sample["swap_total_bytes"]
-            )
-            values = [
-                ("Memory", memory, "Used / total"),
-                ("Swap", swap, "Used / total"),
-                ("CPU", self.format_percent(latest_sample["cpu_percent"]), "Last interval"),
-                ("Temperature", self.format_temperature(latest_sample["temperature_c"]), "Highest readable thermal zone"),
-                ("GPU load", self.format_percent(latest_sample["gpu_busy_percent"]), "Average of supported devices"),
-            ]
-            for title, value, subtitle in values:
-                self.action_row(group, title, subtitle, Gtk.Label(label=value))
-        else:
-            self.action_row(group, "No resource samples",
-                            "Enable Background resource sampling in Preferences to collect optional metrics.")
-
-        group = self.group(page, "Needs attention")
-        if INCIDENTS:
-            self.action_row(
-                group, INCIDENTS[0]["title"], INCIDENTS[0]["detail"],
-                self.status_label(INCIDENTS[0]["severity"], self.severity_style(INCIDENTS[0]["severity"])),
-                "dialog-warning-symbolic",
-                lambda *_: self.show_incident(INCIDENTS[0]),
-            )
-        else:
-            self.action_row(group, "Nothing to review yet",
-                            "Run a scan to discover available diagnostic evidence.")
+        overview = build_overview(self, INCIDENTS, BOOT_SUMMARY, SOURCE_STATUS)
+        self.stack.add_named(overview, "overview")
+        self.pages["overview"] = overview
 
         page = self.add_page("incidents", "Incidents")
         group = self.group(page, "Incident history", "Select an incident to inspect its evidence.")
@@ -537,8 +444,7 @@ class FaultlineWindow(Adw.ApplicationWindow):
             row.add_suffix(spin)
             group.add(row)
 
-        group = self.group(page, "Storage and retention",
-                           "Older boot records are pruned after a successful scan. Unknown timestamps are retained.")
+        group = self.group(page, "Storage and retention",                           "Older boot records are pruned after a successful scan. Unknown timestamps are retained.")
         self.action_row(group, "Local database", str(__import__("pathlib").Path.home() / ".local/share/faultline/crashes.db"))
         clear_button = Gtk.Button(label="Clear")
         clear_button.add_css_class("destructive-action")
@@ -717,8 +623,7 @@ class FaultlineWindow(Adw.ApplicationWindow):
 
         group = self.group(page, "Assessment", incident["detail"])
         self.action_row(group, "Severity", suffix=self.status_label(
-            incident["severity"], self.severity_style(incident["severity"])))
-        self.action_row(group, "Confidence", incident.get("confidence", "Not assessed"))
+            incident["severity"], self.severity_style(incident["severity"])))        self.action_row(group, "Confidence", incident.get("confidence", "Not assessed"))
         self.action_row(group, "Boot ID", incident.get("boot_id", "Unavailable"))
 
         group = self.group(
@@ -897,8 +802,7 @@ class FaultlineWindow(Adw.ApplicationWindow):
     def _set_scan_running(self, running):
         self.scan_button.set_sensitive(not running)
         self.scan_label.set_text("Scanning…" if running else "Scan")
-        self.scan_spinner.set_visible(running)
-        if running:
+        self.scan_spinner.set_visible(running)        if running:
             self.scan_spinner.start()
         else:
             self.scan_spinner.stop()
