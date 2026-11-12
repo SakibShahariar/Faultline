@@ -10,11 +10,14 @@ require administrator privileges.
   dispatches scans on a worker thread so journal processing does not block GTK.
 - **Collector** — CLI and optional systemd user oneshot service/timer. Scans a
   configurable number of recent boots, bounded to 100 by settings.
+- **Sampler** — optional systemd user service. Samples CPU utilization, memory,
+  swap, readable thermal zones, and supported GPU busy values at a configurable
+  interval. Missing metrics remain NULL, not zero. Samples are pruned by age.
 - **Sources** — systemd journal, coredump metadata, pstore, and GNOME extension
   adapters. Every adapter reports missing tools or access failures explicitly.
 - **Core** — stable event signatures, deduplication, rule-based classification,
   shutdown assessment, and extension error correlation.
-- **Storage** — versioned SQLite database at
+- **Storage** — versioned SQLite database (schema version 2) at
   `$XDG_DATA_HOME/faultline/crashes.db` (default
   `~/.local/share/faultline/crashes.db`). Database directories use mode 0700 and
   the database file mode 0600 where supported.
@@ -36,8 +39,9 @@ require administrator privileges.
    records that include an extension path.
 6. Normalize events with source, timestamp, priority, message, and signature.
 7. Store evidence and per-source availability in SQLite.
-8. Apply conservative deterministic rules and store findings with evidence.
-9. Display findings and exact linked evidence in the native UI.
+8. Optionally sample resource metrics into a bounded, time-retained SQLite table.
+9. Apply conservative deterministic rules and store findings with evidence.
+10. Display findings, exact linked evidence, and same-boot resource context in the native UI.
 
 ## Permission model
 
@@ -65,10 +69,11 @@ Findings are replaced per boot after a successful journal scan so rescans do not
 multiply the same diagnosis. Existing findings are preserved if journal access fails.
 The retention policy deletes non-current boot records older than the configured
 number of days; records with unparseable timestamps are retained rather than deleted
-on a guess.
+on a guess. Resource samples have a separate configurable retention window.
 
 ## Current limitations
 
-The optional pre-incident resource sampler, next-login notifications, comprehensive
-cross-boot recurrence engine, and Fedora RPM packaging are not implemented yet.
-The application reports these features as unavailable rather than simulating data.
+The sampler and basic cross-boot recurrence queries are implemented. Next-login
+notifications, richer incident recurrence analysis, and Fedora RPM packaging remain
+unimplemented. The application reports these features as unavailable rather than
+simulating data.
