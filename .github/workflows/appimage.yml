@@ -21,7 +21,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            curl libfuse2 squashfs-tools fakeroot desktop-file-utils appstream docker.io
+            curl libfuse2 squashfs-tools fakeroot desktop-file-utils appstream
 
       - name: Resolve application version
         run: |
