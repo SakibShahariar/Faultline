@@ -37,6 +37,33 @@ class SettingsTests(unittest.TestCase):
             self.assertEqual(path.stat().st_mode & 0o777, 0o600)
             self.assertEqual(path.parent.stat().st_mode & 0o777, 0o700)
 
+    def test_malformed_boolean_values_fall_back_to_safe_defaults(self):
+        with tempfile.TemporaryDirectory() as directory, patch.dict(
+            os.environ, {"XDG_CONFIG_HOME": directory}
+        ):
+            path = Path(directory) / "faultline" / "settings.json"
+            path.parent.mkdir()
+            path.write_text(json.dumps({
+                "background_sampler": "yes",
+                "redact_reports": "false",
+                "collect_pstore": 0,
+                "sample_interval_seconds": True,
+            }))
+            loaded = load_settings()
+            self.assertFalse(loaded["background_sampler"])
+            self.assertTrue(loaded["redact_reports"])
+            self.assertTrue(loaded["collect_pstore"])
+            self.assertEqual(loaded["sample_interval_seconds"], 10)
+
+    def test_updates_reject_wrong_boolean_and_severity_types(self):
+        with tempfile.TemporaryDirectory() as directory, patch.dict(
+            os.environ, {"XDG_CONFIG_HOME": directory}
+        ):
+            with self.assertRaises(ValueError):
+                update_setting("background_sampler", "true")
+            with self.assertRaises(ValueError):
+                update_setting("notification_min_severity", "urgent")
+
     def test_unknown_setting_is_rejected(self):
         with self.assertRaises(KeyError):
             update_setting("arbitrary-command", True)
