@@ -114,14 +114,29 @@ class Database:
             """, [r + (r[0], r[1], r[2], r[7]) for r in rows])
             return self.connection.total_changes - before
 
-    def add_findings(self, boot_id: str, findings: Iterable[Finding]) -> None:
+    def add_findings(
+        self,
+        boot_id: str,
+        findings: Iterable[Finding],
+        replace_categories: Iterable[str] | None = None,
+    ) -> None:
+        rows = list(findings)
+        categories = None if replace_categories is None else sorted(set(replace_categories))
         with self.connection:
-            self.connection.execute("DELETE FROM findings WHERE boot_id = ?", (boot_id,))
-            self.connection.executemany("""
-                INSERT INTO findings(boot_id,category,title,summary,confidence,evidence_json)
-                VALUES(?,?,?,?,?,?)
-            """, [(boot_id, f.category, f.title, f.summary, f.confidence,
-                   json.dumps(f.evidence)) for f in findings])
+            if categories is None:
+                self.connection.execute("DELETE FROM findings WHERE boot_id = ?", (boot_id,))
+            elif categories:
+                placeholders = ",".join("?" for _ in categories)
+                self.connection.execute(
+                    f"DELETE FROM findings WHERE boot_id = ? AND category IN ({placeholders})",
+                    [boot_id, *categories],
+                )
+            if rows:
+                self.connection.executemany("""
+                    INSERT INTO findings(boot_id,category,title,summary,confidence,evidence_json)
+                    VALUES(?,?,?,?,?,?)
+                """, [(boot_id, f.category, f.title, f.summary, f.confidence,
+                       json.dumps(f.evidence)) for f in rows])
 
     def set_source_status(self, source: str, available: bool, detail: str) -> None:
         with self.connection:
