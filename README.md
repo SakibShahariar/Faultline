@@ -62,6 +62,26 @@ For Fedora RPM build instructions, see
 [docs/packaging-fedora.md](docs/packaging-fedora.md) and the spec at
 [packaging/rpm/faultline.spec](packaging/rpm/faultline.spec).
 
+## AppImage
+
+An x86_64 AppImage is available for systems beyond Fedora. It bundles the
+Python, PyGObject, GTK4, and libadwaita runtime; the Fedora RPM remains the
+native Fedora package. See [docs/packaging-appimage.md](docs/packaging-appimage.md)
+for installation, build instructions, runtime requirements, and limitations.
+
+Launch the graphical application:
+
+```sh
+chmod +x Faultline-0.1.0-x86_64.AppImage
+./Faultline-0.1.0-x86_64.AppImage
+```
+
+The CLI is also available through the AppImage by adding `--cli` before the
+normal command, for example `./Faultline-0.1.0-x86_64.AppImage --cli scan`.
+Faultline's database and preferences remain in the normal per-user XDG
+directories, outside the mounted image. The AppImage does not bundle systemd
+diagnostic tools or hardware-specific graphics drivers.
+
 ## Optional background collection
 
 The user timer performs a bounded scan shortly after login and then every six
