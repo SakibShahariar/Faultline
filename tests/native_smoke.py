@@ -32,6 +32,11 @@ window.show_incident({
     "evidence_truncated": False,
 })
 assert window.stack.get_visible_child_name() == "incident-detail"
+module.INCIDENTS = [{
+    "id": "FL-0001",
+    "boot_id": "a" * 32,
+    "evidence": [("2026-11-10T09:00:00+00:00", "kernel", "Out of memory: Killed process 123")],
+}]
 window.show_recurrence({
     "signature": "fixture-signature",
     "sources": "kernel",
