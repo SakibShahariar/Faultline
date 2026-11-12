@@ -512,13 +512,31 @@ class FaultlineWindow(Adw.ApplicationWindow):
         return GLib.SOURCE_REMOVE
 
     def export_dialog(self):
+        from faultline.reports import build_report
+        from faultline.storage import Database
+
+        db = Database()
+        try:
+            report = build_report(db, redact=True)
+        finally:
+            db.close()
+        boot_count = len(report["boots"])
+        finding_count = sum(len(boot["findings"]) for boot in report["boots"])
+        event_count = sum(len(boot["events"]) for boot in report["boots"])
         dialog = Adw.AlertDialog(
-            heading="Create diagnostic report",
-            body="The native report flow will provide a preview, selectable evidence, and privacy redaction before writing a Markdown or JSON file.",
+            heading="Review diagnostic report",
+            body=(
+                f"Preview: {boot_count} boot(s), {finding_count} finding(s), "
+                f"and {event_count} event record(s).\n\n"
+                "Home paths, email addresses, IP addresses, MAC addresses, and bearer "
+                "tokens are redacted by default. The report stays on this device; "
+                "review the saved file before sharing it."
+            ),
         )
         dialog.add_response("cancel", "Cancel")
-        dialog.add_response("create", "Create Report")
-        dialog.set_response_appearance("create", Adw.ResponseAppearance.SUGGESTED)
+        dialog.add_response("markdown", "Save Markdown")
+        dialog.add_response("json", "Save JSON")
+        dialog.set_response_appearance("markdown", Adw.ResponseAppearance.SUGGESTED)
         dialog.choose(self, None, self.export_finished)
 
     def export_finished(self, dialog, result):
@@ -526,8 +544,43 @@ class FaultlineWindow(Adw.ApplicationWindow):
             response = dialog.choose_finish(result)
         except Exception:
             return
-        if response == "create":
-            self.toast("Report export is not implemented yet.")
+        if response in ("markdown", "json"):
+            self.choose_report_path(response)
+
+    def choose_report_path(self, report_format):
+        extension = "md" if report_format == "markdown" else "json"
+        chooser = Gtk.FileChooserNative.new(
+            "Save Faultline report", self, Gtk.FileChooserAction.SAVE,
+            "Save", "Cancel",
+        )
+        chooser.set_current_name(f"faultline-report.{extension}")
+        chooser.connect("response", self.report_path_selected, report_format)
+        chooser.show()
+
+    def report_path_selected(self, chooser, response, report_format):
+        if response != Gtk.ResponseType.ACCEPT:
+            chooser.destroy()
+            return
+        file = chooser.get_file()
+        path = file.get_path() if file else None
+        chooser.destroy()
+        if not path:
+            self.toast("Could not access the selected report path.")
+            return
+        try:
+            from faultline.reports import build_report, write_report
+            from faultline.storage import Database
+
+            db = Database()
+            try:
+                report = build_report(db, redact=True)
+            finally:
+                db.close()
+            write_report(path, report, report_format)
+        except Exception as exc:
+            self.toast("Report export failed: " + str(exc))
+            return
+        self.toast("Redacted report saved.")
 
     def toast(self, message):
         self.toast_overlay.add_toast(Adw.Toast.new(message))
