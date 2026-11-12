@@ -8,7 +8,9 @@ Faultline is a planned native GTK4/libadwaita application for understanding Linu
 
 Open the [interactive UI prototype](demo/index.html) in a browser.
 
-The prototype follows GNOME/libadwaita design conventions more closely than a generic web dashboard: a compact header bar, navigation sidebar, restrained Adwaita-style surfaces, clear status indicators, responsive layouts, and preference rows. It is still a standalone HTML/CSS/JavaScript prototype—not a native GTK application and not a pixel-perfect reproduction of libadwaita widgets.
+The prototype is a visual and interaction reference for a GNOME desktop app. Its layout is based on libadwaita patterns: a compact header bar, split-view navigation, grouped content, restrained status styling, preference groups and action rows, and responsive navigation. It intentionally avoids a generic analytics-dashboard look.
+
+It is still HTML/CSS/JavaScript, not a native GTK application. Browser controls only approximate the appearance and behavior of libadwaita widgets; the native implementation should use the real GTK4 and libadwaita components.
 
 All incidents, system metrics, extension activity, and timestamps shown are fictional sample data. Buttons and controls demonstrate navigation and interaction only; the prototype does not inspect or modify the host system.
 
