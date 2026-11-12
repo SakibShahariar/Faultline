@@ -3,7 +3,12 @@ from __future__ import annotations
 
 from .coredumps import list_coredump_events
 from .diagnostics import classify
-from .extensions import correlate_extension_events, list_enabled_extensions
+from .extensions import (
+    correlate_extension_events,
+    is_extension_error_candidate,
+    is_shell_failure,
+    list_enabled_extensions,
+)
 from .models import Event, Finding
 from .pstore import read_pstore
 from .settings import load_settings
@@ -96,6 +101,8 @@ def scan(database: Database | None = None, notify: bool = False) -> dict:
             db.upsert_boot(boot)
             findings_by_category: dict[str, Finding] = {}
             extension_findings: dict[str, Finding] = {}
+            extension_candidates: list[Event] = []
+            shell_failures: list[Event] = []
             shutdown_evidence: list[Event] = []
             batch: list[Event] = []
             journal_ok = True
@@ -109,34 +116,18 @@ def scan(database: Database | None = None, notify: bool = False) -> dict:
                         "general protection fault",
                     )):
                         shutdown_evidence.append(event)
+                    if extensions_ok and is_extension_error_candidate(event):
+                        extension_candidates.append(event)
+                    if extensions_ok and is_shell_failure(event):
+                        shell_failures.append(event)
                     batch.append(event)
                     if len(batch) >= BATCH_SIZE:
-                        correlated_events, correlated_findings = correlate_extension_events(
-                            batch, enabled_extensions
-                        )
-                        summary["events_added"] += db.add_events(correlated_events)
-                        _merge_findings(findings_by_category, correlated_events)
-                        for finding in correlated_findings:
-                            current = extension_findings.get(finding.title)
-                            if current is None:
-                                extension_findings[finding.title] = finding
-                            else:
-                                current.evidence.extend(finding.evidence)
-                                current.evidence = current.evidence[:20]
+                        summary["events_added"] += db.add_events(batch)
+                        _merge_findings(findings_by_category, batch)
                         batch.clear()
                 if batch:
-                    correlated_events, correlated_findings = correlate_extension_events(
-                        batch, enabled_extensions
-                    )
-                    summary["events_added"] += db.add_events(correlated_events)
-                    _merge_findings(findings_by_category, correlated_events)
-                    for finding in correlated_findings:
-                        current = extension_findings.get(finding.title)
-                        if current is None:
-                            extension_findings[finding.title] = finding
-                        else:
-                            current.evidence.extend(finding.evidence)
-                            current.evidence = current.evidence[:20]
+                    summary["events_added"] += db.add_events(batch)
+                    _merge_findings(findings_by_category, batch)
                     batch.clear()
             except SourceError as exc:
                 journal_ok = False
@@ -147,6 +138,15 @@ def scan(database: Database | None = None, notify: bool = False) -> dict:
 
             if journal_ok:
                 db.set_source_status(f"journal:{boot.boot_id}", True, "Journal records collected incrementally")
+
+            if extensions_ok and extension_candidates and shell_failures:
+                correlated_events, correlated_findings = correlate_extension_events(
+                    extension_candidates, enabled_extensions, shell_failures
+                )
+                for event in correlated_events:
+                    db.update_event_metadata(event)
+                for finding in correlated_findings:
+                    extension_findings[finding.title] = finding
 
             coredump_events = coredumps_by_boot.get(boot.boot_id, [])
             if coredump_events:
