@@ -355,36 +355,52 @@ class FaultlineWindow(Adw.ApplicationWindow):
             self.action_row(group, title, subtitle, self.status_label(state, style))
 
         page = self.add_page("extensions", "Extensions")
-        group = self.group(page, "GNOME Shell extensions",
-                           "Extension activity can be correlated with incidents, but timing alone is not proof.")
         extension_status = SOURCE_STATUS.get("gnome-extensions")
+        try:
+            from faultline.extensions import describe_enabled_extensions, list_enabled_extensions
+            extension_inventory = describe_enabled_extensions(list_enabled_extensions())
+        except Exception:
+            extension_inventory = []
+
+        group = self.group(
+            page,
+            f"Enabled extensions ({len(extension_inventory)})" if extension_inventory else "Enabled extensions",
+        )
+        if extension_inventory:
+            for extension in extension_inventory:
+                version = extension.get("version")
+                subtitle = f"Version {version}" if version is not None else "Version unavailable"
+                row = self.action_row(group, extension["name"], subtitle, icon="application-x-addon-symbolic")
+                row.set_tooltip_text(extension["uuid"])
+        elif extension_status and not extension_status["available"]:
+            self.action_row(group, "Extension list unavailable", "Run a scan to refresh extension information.")
+        else:
+            self.action_row(group, "No enabled extensions found")
+
         if extension_status:
-            self.action_row(
-                group, "Enabled extension inventory",
-                extension_status["detail"] + " · checked " + extension_status["checked_at"],
-                self.status_label(
-                    "Stale" if extension_status["available"] and extension_status.get("stale") else
-                    ("Available" if extension_status["available"] else "Unavailable"),
-                    "warning" if not extension_status["available"] or extension_status.get("stale") else "success",
-                ),
+            state = (
+                "Stale" if extension_status["available"] and extension_status.get("stale") else
+                ("Available" if extension_status["available"] else "Unavailable")
             )
+            style = "warning" if state in {"Stale", "Unavailable"} else "success"
+            status_group = self.group(page, "Scan status")
+            self.action_row(status_group, state, extension_status["checked_at"])
+
         extension_incidents = [
             incident for incident in INCIDENTS
             if incident["category"] == "extension-error"
         ]
+        incidents_group = self.group(page, f"Related incidents ({len(extension_incidents)})")
         if extension_incidents:
             for incident in extension_incidents:
                 self.action_row(
-                    group, incident["title"], incident["detail"],
-                    self.status_label("Correlated", "warning"),
+                    incidents_group, incident["title"], incident["subtitle"],
+                    self.status_label("Open incident", "warning"),
                     "application-x-addon-symbolic",
                     lambda *_args, item=incident: self.show_incident(item),
                 )
         else:
-            self.action_row(
-                group, "No explicit extension error match",
-                "Faultline only lists an extension when an error record explicitly references an enabled extension. No causal claim is made."
-            )
+            self.action_row(incidents_group, "No related incidents")
 
         page = self.add_page("reports", "Reports")
         group = self.group(page, "Export diagnostics", "Reports are generated locally and should be reviewed before sharing.")
