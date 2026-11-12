@@ -267,6 +267,8 @@ class FaultlineWindow(Adw.ApplicationWindow):
         db = Database()
         try:
             recurring_events = find_recurring_events(db)
+            sample_rows = db.latest_samples(1)
+            latest_sample = dict(sample_rows[0]) if sample_rows else None
         finally:
             db.close()
 
@@ -310,14 +312,29 @@ class FaultlineWindow(Adw.ApplicationWindow):
             self.action_row(group, "No recurring signatures",
                             "A pattern appears here after the same normalized event is recorded in at least two boots.")
 
-        group = self.group(page, "Resource snapshot", "Resource sampling is not implemented yet.")
-        for title, value, subtitle in [
-            ("Memory", "Not collected", "Optional sampler planned"),
-            ("Swap", "Not collected", "Optional sampler planned"),
-            ("CPU", "Not collected", "Optional sampler planned"),
-            ("Temperatures", "Not collected", "Hardware metrics are not queried"),
-        ]:
-            self.action_row(group, title, subtitle, Gtk.Label(label=value))
+        group = self.group(
+            page, "Resource snapshot",
+            "Latest optional sample; unavailable hardware metrics remain blank."
+        )
+        if latest_sample:
+            memory = self.format_sample_memory(
+                latest_sample["memory_used_bytes"], latest_sample["memory_total_bytes"]
+            )
+            swap = self.format_sample_memory(
+                latest_sample["swap_used_bytes"], latest_sample["swap_total_bytes"]
+            )
+            values = [
+                ("Memory", memory, "Used / total"),
+                ("Swap", swap, "Used / total"),
+                ("CPU", self.format_percent(latest_sample["cpu_percent"]), "Last interval"),
+                ("Temperature", self.format_temperature(latest_sample["temperature_c"]), "Highest readable thermal zone"),
+                ("GPU load", self.format_percent(latest_sample["gpu_busy_percent"]), "Average of supported devices"),
+            ]
+            for title, value, subtitle in values:
+                self.action_row(group, title, subtitle, Gtk.Label(label=value))
+        else:
+            self.action_row(group, "No resource samples",
+                            "Enable Background resource sampling in Preferences to collect optional metrics.")
 
         group = self.group(page, "Needs attention")
         if INCIDENTS:
@@ -342,20 +359,29 @@ class FaultlineWindow(Adw.ApplicationWindow):
             )
 
         page = self.add_page("health", "System health")
-        group = self.group(page, "Resource history", "The optional background sampler has not been implemented.")
-        for title, value, subtitle in [
-            ("Memory", "No samples", "Resource sampling is not enabled"),
-            ("Swap", "No samples", "Resource sampling is not enabled"),
-            ("CPU load", "No samples", "Resource sampling is not enabled"),
-        ]:
-            self.action_row(group, title, subtitle, Gtk.Label(label=value))
+        group = self.group(
+            page, "Resource history",
+            "Most recent sample: " + (latest_sample["captured_at"] if latest_sample else "no samples recorded")
+        )
+        if latest_sample:
+            for title, value, subtitle in [
+                ("Memory", self.format_sample_memory(latest_sample["memory_used_bytes"], latest_sample["memory_total_bytes"]), "Used / total"),
+                ("Swap", self.format_sample_memory(latest_sample["swap_used_bytes"], latest_sample["swap_total_bytes"]), "Used / total"),
+                ("CPU load", self.format_percent(latest_sample["cpu_percent"]), "Last sampling interval"),
+                ("Temperature", self.format_temperature(latest_sample["temperature_c"]), "Highest readable thermal zone"),
+                ("GPU load", self.format_percent(latest_sample["gpu_busy_percent"]), "Supported GPU devices only"),
+            ]:
+                self.action_row(group, title, subtitle, Gtk.Label(label=value))
+        else:
+            self.action_row(group, "No resource samples",
+                            "Enable the optional background sampler in Preferences.")
         group = self.group(page, "Diagnostic sources", "Availability depends on system permissions and configuration.")
         for title, source, fallback in [
             ("Boot journals", "journal", "Not checked"),
             ("Application coredumps", "coredumpctl", "Not checked"),
             ("Kernel messages", "journal", "Collected through journal"),
             ("pstore", "pstore", "Not implemented"),
-            ("Resource sampler", "sampler", "Not implemented"),
+            ("Resource sampler", "sampler", "Not enabled"),
         ]:
             status = SOURCE_STATUS.get(source)
             state = ("Available" if status["available"] else "Unavailable") if status else fallback
@@ -451,6 +477,21 @@ class FaultlineWindow(Adw.ApplicationWindow):
         self.action_row(group, "Desktop notifications", "Not active in this version.")
 
         self.show_page("overview")
+
+    @staticmethod
+    def format_percent(value):
+        return f"{value:.1f}%" if value is not None else "Unavailable"
+
+    @staticmethod
+    def format_temperature(value):
+        return f"{value:.1f} °C" if value is not None else "Unavailable"
+
+    @staticmethod
+    def format_sample_memory(used, total):
+        if used is None or total is None:
+            return "Unavailable"
+        gib = 1024 ** 3
+        return f"{used / gib:.1f} / {total / gib:.1f} GiB"
 
     def on_sampler_switch(self, row, _property):
         import subprocess
