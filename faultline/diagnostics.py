@@ -38,15 +38,17 @@ RULES = [
 
 
 def classify(events: list[Event]) -> list[Finding]:
-    grouped: dict[str, list[str]] = defaultdict(list)
+    grouped: dict[str, dict[tuple[str, str], str]] = defaultdict(dict)
     for event in events:
         for category, _title, pattern, _summary in RULES:
             if pattern.search(event.message):
-                grouped[category].append(event.message[:500])
+                identity = event.signature or event.message.lower()
+                grouped[category][(identity, event.timestamp)] = event.message[:500]
     findings: list[Finding] = []
     for category, title, _pattern, summary in RULES:
-        evidence = grouped.get(category, [])
-        if evidence:
-            confidence = "high" if len(evidence) >= 2 else "moderate"
+        records = grouped.get(category, {})
+        evidence = list(dict.fromkeys(records.values()))
+        if records:
+            confidence = "high" if len(records) >= 2 else "moderate"
             findings.append(Finding(category, title, summary, confidence, evidence[:20]))
     return findings
