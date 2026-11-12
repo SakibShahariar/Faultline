@@ -18,6 +18,9 @@ class SamplerTests(unittest.TestCase):
                 "MemTotal: 1024 kB\nMemAvailable: 400 kB\n"
                 "SwapTotal: 512 kB\nSwapFree: 256 kB\n"
             )
+            (proc / "diskstats").write_text(
+                "8 0 sda 100 0 200 0 50 0 300 0 0 400 0\n"
+            )
             (proc / "sys/kernel/random/boot_id").write_text("a" * 32)
             thermal = sys / "class/thermal/thermal_zone0"
             thermal.mkdir(parents=True)
@@ -33,6 +36,9 @@ class SamplerTests(unittest.TestCase):
             self.assertEqual(sample["swap_used_bytes"], 256 * 1024)
             self.assertEqual(sample["temperature_c"], 45.0)
             self.assertEqual(sample["gpu_busy_percent"], 40.0)
+            self.assertEqual(sample["metadata"]["disk_read_bytes"], 200 * 512)
+            self.assertEqual(sample["metadata"]["disk_write_bytes"], 300 * 512)
+            self.assertEqual(sample["metadata"]["disk_io_time_ms"], 400)
             self.assertEqual(sample["boot_id"], "a" * 32)
             self.assertEqual(counters, (200, 70))
 
