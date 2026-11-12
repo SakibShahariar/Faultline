@@ -71,6 +71,34 @@ def _read_gpu_busy(sys_root: Path) -> tuple[float | None, int]:
     return (sum(readings) / len(readings) if readings else None), len(readings)
 
 
+def _read_disk_counters(proc_root: Path, sys_root: Path) -> tuple[int | None, int | None, int]:
+    read_bytes = 0
+    written_bytes = 0
+    io_time_ms = 0
+    devices = 0
+    try:
+        lines = (proc_root / "diskstats").read_text(encoding="ascii").splitlines()
+    except OSError:
+        return None, None, 0
+    for line in lines:
+        parts = line.split()
+        if len(parts) < 14:
+            continue
+        device = parts[2]
+        if (sys_root / "class/block" / device / "partition").exists():
+            continue
+        try:
+            read_bytes += int(parts[5]) * 512
+            written_bytes += int(parts[9]) * 512
+            io_time_ms += int(parts[12])
+            devices += 1
+        except (ValueError, IndexError):
+            continue
+    if not devices:
+        return None, None, 0
+    return read_bytes, written_bytes, devices
+
+
 def collect_sample(
     previous_cpu: tuple[int, int] | None = None,
     proc_root: Path = Path("/proc"),
@@ -94,6 +122,9 @@ def collect_sample(
 
     temperature, temperature_sources = _read_temperature(sys_root)
     gpu_busy, gpu_count = _read_gpu_busy(sys_root)
+    disk_read_bytes, disk_write_bytes, disk_devices = _read_disk_counters(
+        proc_root, sys_root
+    )
     try:
         boot_id = (proc_root / "sys/kernel/random/boot_id").read_text().strip()
         if not _BOOT_ID_RE.fullmatch(boot_id):
@@ -114,6 +145,10 @@ def collect_sample(
         "metadata": {
             "temperature_sensors": temperature_sources,
             "gpu_devices_sampled": gpu_count,
+            "disk_read_bytes": disk_read_bytes,
+            "disk_write_bytes": disk_write_bytes,
+            "disk_io_time_ms": disk_io_time_ms if False else None,
+            "disk_devices_sampled": disk_devices,
             "cpu_available": counters is not None and previous_cpu is not None,
             "memory_available": mem_total is not None and mem_available is not None,
             "swap_available": swap_total is not None and swap_free is not None,
