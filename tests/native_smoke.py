@@ -24,6 +24,30 @@ icon_theme = module.Gtk.IconTheme.get_for_display(window.get_display())
 for _name, _label, icon_name in window.nav_names:
     assert icon_theme.has_icon(icon_name), f"Missing bundled navigation icon: {icon_name}"
 assert window.get_visible(), "Faultline main window is not visible"
+assert window.scan_label.get_text() == "Scan"
+assert not window.scan_spinner.get_visible()
+window._set_scan_running(True)
+assert not window.scan_button.get_sensitive()
+assert window.scan_spinner.get_visible()
+assert window.scan_spinner.get_spinning()
+assert window.scan_label.get_text() == "Scanning…"
+window._set_scan_running(False)
+assert window.scan_button.get_sensitive()
+assert not window.scan_spinner.get_visible()
+assert window.scan_label.get_text() == "Scan"
+messages = []
+window.refresh_data_async = lambda: None
+window.toast = messages.append
+window._scan_complete(
+    {"findings": 0, "boots_seen": 2, "new_findings": [], "source_errors": []},
+    None,
+)
+assert messages[-1] == "No findings detected across 2 boot(s)."
+window._scan_complete(
+    {"findings": 3, "boots_seen": 2, "new_findings": [{}], "source_errors": [{}]},
+    None,
+)
+assert messages[-1] == "Scan complete: 3 finding(s) across 2 boot(s), including 1 new; 1 source warning(s)."
 requested_width, requested_height = window.get_size_request()
 assert requested_width < 760 and requested_height < 560, (
     f"Window still imposes a large minimum size: {requested_width}x{requested_height}"

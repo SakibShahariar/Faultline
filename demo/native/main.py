@@ -99,7 +99,13 @@ class FaultlineWindow(Adw.ApplicationWindow):
         search_button.connect("clicked", lambda *_: self.show_page("incidents"))
         header.pack_end(search_button)
 
-        scan_button = Gtk.Button(label="Scan")
+        scan_content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        self.scan_spinner = Gtk.Spinner()
+        self.scan_spinner.set_visible(False)
+        self.scan_label = Gtk.Label(label="Scan")
+        scan_content.append(self.scan_spinner)
+        scan_content.append(self.scan_label)
+        scan_button = Gtk.Button(child=scan_content)
         self.scan_button = scan_button
         scan_button.add_css_class("suggested-action")
         scan_button.connect("clicked", self.scan_dialog)
@@ -884,9 +890,18 @@ class FaultlineWindow(Adw.ApplicationWindow):
         except Exception:
             return
         if response == "scan":
-            self.scan_button.set_sensitive(False)
+            self._set_scan_running(True)
             self.toast("Scanning available diagnostic sources…")
             threading.Thread(target=self._run_scan, daemon=True).start()
+
+    def _set_scan_running(self, running):
+        self.scan_button.set_sensitive(not running)
+        self.scan_label.set_text("Scanning…" if running else "Scan")
+        self.scan_spinner.set_visible(running)
+        if running:
+            self.scan_spinner.start()
+        else:
+            self.scan_spinner.stop()
 
     def _run_scan(self):
         try:
@@ -900,15 +915,25 @@ class FaultlineWindow(Adw.ApplicationWindow):
 
     def _scan_complete(self, result, error):
         global INCIDENTS, BOOT_SUMMARY, SOURCE_STATUS
-        self.scan_button.set_sensitive(True)
+        self._set_scan_running(False)
         if error:
             self.toast("Scan failed: " + error)
             return GLib.SOURCE_REMOVE
         self.refresh_data_async()
-        if result and result["source_errors"]:
-            self.toast(f"Scan finished with {len(result['source_errors'])} source warning(s).")
+        result = result or {}
+        findings = int(result.get("findings", 0))
+        boots = int(result.get("boots_seen", 0))
+        new_findings = len(result.get("new_findings", []))
+        warnings = len(result.get("source_errors", []))
+        if findings:
+            message = f"Scan complete: {findings} finding(s) across {boots} boot(s)"
+            if new_findings:
+                message += f", including {new_findings} new"
         else:
-            self.toast("Scan completed.")
+            message = f"No findings detected across {boots} boot(s)"
+        if warnings:
+            message += f"; {warnings} source warning(s)"
+        self.toast(message + ".")
         return GLib.SOURCE_REMOVE
 
     def export_dialog(self):
