@@ -94,6 +94,14 @@ class DiagnosisTests(unittest.TestCase):
         ]
         self.assertEqual(classify(events), [])
 
+    def test_detects_explicit_gnome_shell_restart_without_calling_it_a_crash(self):
+        event = Event(
+            "c" * 32, "now", "systemd",
+            "gnome-shell.service: Scheduled restart job, restart counter is at 1",
+        )
+        findings = classify([event])
+        self.assertEqual([item.category for item in findings], ["shell-restart"])
+
     def test_kernel_gpu_storage_and_shell_rules_are_distinct(self):
         cases = [
             ("kernel", "Kernel panic - not syncing: fatal exception", "kernel-panic"),
