@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 from faultline.models import Boot, Event
+from faultline.signatures import signature_for
 from faultline.storage import Database
 
 
@@ -20,6 +21,12 @@ class StorageMigrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "faultline.db"
             db = Database(path)
+            boot_id = "d" * 32
+            db.upsert_boot(Boot(boot_id))
+            db.add_events([Event(
+                boot_id, "2026-01-01", "kernel", "Legacy OOM message",
+                signature="legacy-source-prefixed-signature",
+            )])
             db.connection.execute("DROP TABLE samples")
             db.connection.execute("PRAGMA user_version = 1")
             db.close()
@@ -33,6 +40,10 @@ class StorageMigrationTests(unittest.TestCase):
             }
             self.assertEqual(version, 3)
             self.assertIn("samples", tables)
+            stored_signature = migrated.connection.execute(
+                "SELECT signature FROM events WHERE boot_id = ?", (boot_id,)
+            ).fetchone()["signature"]
+            self.assertEqual(stored_signature, signature_for("Legacy OOM message", "kernel"))
             migrated.close()
 
     def test_failed_event_batch_rolls_back_all_rows(self):
