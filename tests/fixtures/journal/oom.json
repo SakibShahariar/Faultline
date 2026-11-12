@@ -1,0 +1,8 @@
+{
+  "MESSAGE": "Out of memory: Killed process 4242 (demo-app) total-vm:100000kB",
+  "__REALTIME_TIMESTAMP": "1794475800000000",
+  "SYSLOG_IDENTIFIER": "kernel",
+  "PRIORITY": "3",
+  "_BOOT_ID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "_SYSTEMD_UNIT": "systemd-oomd.service"
+}
