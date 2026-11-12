@@ -51,10 +51,19 @@ def scan(database: Database | None = None) -> dict:
         for boot in boots:
             db.upsert_boot(boot)
             findings_by_category: dict[str, Finding] = {}
+            shutdown_evidence: list[Event] = []
             batch: list[Event] = []
             journal_ok = True
             try:
                 for event in iter_boot_events(boot.boot_id):
+                    lowered = event.message.lower()
+                    if any(marker in lowered for marker in (
+                        "reached target system shutdown", "reached target system power-off",
+                        "reached target system reboot", "systemd-shutdown",
+                        "kernel panic", "oops:", "bug: unable to handle",
+                        "general protection fault",
+                    )):
+                        shutdown_evidence.append(event)
                     batch.append(event)
                     if len(batch) >= BATCH_SIZE:
                         summary["events_added"] += db.add_events(batch)
@@ -79,13 +88,7 @@ def scan(database: Database | None = None) -> dict:
                 summary["events_added"] += db.add_events(coredump_events)
                 _merge_findings(findings_by_category, coredump_events)
 
-            boot.shutdown_status = assess_shutdown(
-                [Event(boot_id=boot.boot_id, timestamp="", source="summary",
-                       message=evidence)
-                 for finding in findings_by_category.values()
-                 for evidence in finding.evidence],
-                current=boot.current,
-            )
+            boot.shutdown_status = assess_shutdown(shutdown_evidence, current=boot.current)
             db.upsert_boot(boot)
             findings = list(findings_by_category.values())
             db.add_findings(boot.boot_id, findings)
