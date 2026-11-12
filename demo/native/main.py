@@ -28,7 +28,7 @@ def evidence_detail(event):
             "Stack trace summary: " +
             (metadata.get("stack_summary") or "not available from coredump metadata")
         )
-    return "\\n".join(lines)
+    return "\n".join(lines)
 
 
 def load_incidents():
