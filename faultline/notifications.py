@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 
@@ -20,54 +19,46 @@ SEVERITY = {
 }
 
 
-def dispatch_notifications(findings: list[dict], settings: dict) -> int:
-    if not shutil.which("notify-send"):
-        return 0
-    rank = {"low": 0, "medium": 1, "high": 2}
-    threshold = rank.get(settings.get("notification_min_severity", "low"), 0)
-    eligible = [
-        finding for finding in findings
-        if rank.get(SEVERITY.get(finding["category"], "low"), 0) >= threshold
-    ]
-    started = 0
-    for finding in eligible[:5]:
-        incident_id = f"FL-{int(finding['id']):04d}"
-        title = "Faultline: " + finding["title"]
-        body = finding["summary"][:300]
+def _gui_command() -> str:
+    return shutil.which("faultline-gui") or str(
+        Path.home() / ".local" / "bin" / "faultline-gui"
+    )
+
+
+def _launch_incident(incident_id: str) -> bool:
+    gui = _gui_command()
+    if shutil.which("systemd-run"):
+        unit_name = "faultline-open-" + incident_id.lower().replace("-", "")
         try:
-            subprocess.Popen(
+            result = subprocess.run(
                 [
-                    sys.executable, "-m", "faultline.notifications",
-                    "--incident-id", incident_id,
-                    "--title", title,
-                    "--body", body,
-                    "--severity", SEVERITY.get(finding["category"], "low"),
+                    "systemd-run", "--user", f"--unit={unit_name}",
+                    "--collect", "--no-block", gui, "--incident-id", incident_id,
                 ],
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True,
+                capture_output=True, text=True, timeout=10,
             )
-            started += 1
-        except OSError:
-            continue
-    return started
+            return result.returncode == 0
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+
+    try:
+        subprocess.Popen(
+            [gui, "--incident-id", incident_id],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+        return True
+    except OSError:
+        return False
 
 
-def main() -> int:
-    import argparse
-
-    parser = argparse.ArgumentParser(prog="faultline-notification")
-    parser.add_argument("--incident-id", required=True)
-    parser.add_argument("--title", required=True)
-    parser.add_argument("--body", default="")
-    parser.add_argument("--severity", choices=("low", "medium", "high"), default="low")
-    args = parser.parse_args()
-
+def _show_notification(incident_id: str, title: str, body: str, severity: str) -> bool:
     if not shutil.which("notify-send"):
-        return 1
-    urgency = "critical" if args.severity == "high" else (
-        "normal" if args.severity == "medium" else "low"
+        return False
+    urgency = "critical" if severity == "high" else (
+        "normal" if severity == "medium" else "low"
     )
     try:
         result = subprocess.run(
@@ -79,31 +70,56 @@ def main() -> int:
                 "--expire-time=10000",
                 "--action=default=Open Faultline",
                 "--wait",
-                args.title,
-                args.body,
+                title,
+                body[:300],
             ],
             capture_output=True,
             text=True,
             timeout=20,
         )
     except (OSError, subprocess.TimeoutExpired):
-        return 1
+        return False
 
     if result.returncode == 0 and result.stdout.strip() == "default":
-        try:
-            gui_command = shutil.which("faultline-gui") or str(
-                Path.home() / ".local" / "bin" / "faultline-gui"
-            )
-            subprocess.Popen(
-                [gui_command, "--incident-id", args.incident_id],
-                stdin=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True,
-            )
-        except OSError:
-            return 1
-    return 0
+        _launch_incident(incident_id)
+    return result.returncode == 0
+
+
+def dispatch_notifications(findings: list[dict], settings: dict) -> int:
+    if not settings.get("notify_new_incidents", True) or not shutil.which("notify-send"):
+        return 0
+    rank = {"low": 0, "medium": 1, "high": 2}
+    threshold = rank.get(settings.get("notification_min_severity", "low"), 0)
+    eligible = [
+        finding for finding in findings
+        if rank.get(SEVERITY.get(finding["category"], "low"), 0) >= threshold
+    ]
+    sent = 0
+    # Keep a large batch from blocking a login for an extended period.
+    for finding in eligible[:3]:
+        incident_id = f"FL-{int(finding['id']):04d}"
+        if _show_notification(
+            incident_id,
+            "Faultline: " + finding["title"],
+            finding["summary"],
+            SEVERITY.get(finding["category"], "low"),
+        ):
+            sent += 1
+    return sent
+
+
+def main() -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(prog="faultline-notification")
+    parser.add_argument("--incident-id", required=True)
+    parser.add_argument("--title", required=True)
+    parser.add_argument("--body", default="")
+    parser.add_argument("--severity", choices=("low", "medium", "high"), default="low")
+    args = parser.parse_args()
+    return 0 if _show_notification(
+        args.incident_id, args.title, args.body, args.severity
+    ) else 1
 
 
 if __name__ == "__main__":
