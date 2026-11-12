@@ -1,0 +1,14 @@
+#!/bin/sh
+set -eu
+
+if [ -z "${APPDIR:-}" ]; then
+    echo "Faultline AppImage launcher must be started through AppRun." >&2
+    exit 1
+fi
+
+if [ "${1:-}" = "--cli" ]; then
+    shift
+    exec "$APPDIR/usr/bin/python3" -m faultline.cli "$@"
+fi
+
+exec "$APPDIR/usr/bin/python3" "$APPDIR/usr/share/faultline/demo/native/main.py" "$@"
