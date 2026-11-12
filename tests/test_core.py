@@ -71,6 +71,18 @@ class DiagnosisTests(unittest.TestCase):
         ]
         self.assertEqual(classify(events), [])
 
+    def test_kernel_gpu_storage_and_shell_rules_are_distinct(self):
+        cases = [
+            ("kernel", "Kernel panic - not syncing: fatal exception", "kernel-panic"),
+            ("kernel", "amdgpu: ring gfx timeout, GPU reset", "gpu-reset"),
+            ("kernel", "nvme nvme0: I/O error", "storage-error"),
+            ("gnome-shell", "gnome-shell segfaulted and dumped core", "shell-crash"),
+        ]
+        for source, message, expected in cases:
+            with self.subTest(category=expected):
+                findings = classify([Event("c" * 32, "now", source, message)])
+                self.assertIn(expected, {finding.category for finding in findings})
+
     def test_corroborating_oom_evidence_raises_confidence(self):
         events = [
             Event("c" * 32, "now", "kernel", "Out of memory: Killed process 12"),
