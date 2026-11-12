@@ -155,6 +155,7 @@ class FaultlineWindow(Adw.ApplicationWindow):
         header.pack_end(search_button)
 
         scan_button = Gtk.Button(label="Scan")
+        self.scan_button = scan_button
         scan_button.add_css_class("suggested-action")
         scan_button.connect("clicked", self.scan_dialog)
         header.pack_end(scan_button)
@@ -655,6 +656,7 @@ class FaultlineWindow(Adw.ApplicationWindow):
         except Exception:
             return
         if response == "scan":
+            self.scan_button.set_sensitive(False)
             self.toast("Scanning available diagnostic sources…")
             threading.Thread(target=self._run_scan, daemon=True).start()
 
@@ -670,6 +672,7 @@ class FaultlineWindow(Adw.ApplicationWindow):
 
     def _scan_complete(self, result, error):
         global INCIDENTS, BOOT_SUMMARY, SOURCE_STATUS
+        self.scan_button.set_sensitive(True)
         if error:
             self.toast("Scan failed: " + error)
             return GLib.SOURCE_REMOVE
