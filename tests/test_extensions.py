@@ -30,6 +30,15 @@ class ExtensionCorrelationTests(unittest.TestCase):
         self.assertEqual(inventory[0]["version"], 67)
         self.assertEqual(inventory[0]["state"], "enabled")
 
+    def test_missing_extension_metadata_falls_back_to_uuid(self):
+        extension = "missing-extension@example.test"
+        with tempfile.TemporaryDirectory() as directory:
+            with patch("faultline.extensions.extension_metadata_roots", return_value=(Path(directory),)):
+                inventory = describe_enabled_extensions({extension})
+        self.assertEqual(inventory[0]["name"], extension)
+        self.assertIsNone(inventory[0]["version"])
+        self.assertEqual(inventory[0]["state"], "enabled")
+
     def test_parses_sanitized_gnome_journal_fixture(self):
         fixture = Path(__file__).parent / "fixtures" / "gnome-shell" / "extension-error.json"
         row = json.loads(fixture.read_text(encoding="utf-8"))
