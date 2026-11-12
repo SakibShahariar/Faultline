@@ -46,3 +46,30 @@ class Finding:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass(slots=True)
+class Sample:
+    boot_id: str
+    captured_at: str
+    cpu_percent: float | None = None
+    memory_used_bytes: int | None = None
+    memory_total_bytes: int | None = None
+    swap_used_bytes: int | None = None
+    swap_total_bytes: int | None = None
+    temperature_c: float | None = None
+    gpu_busy_percent: float | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class Incident:
+    incident_id: str
+    boot_id: str
+    category: str
+    title: str
+    summary: str
+    confidence: str
+    first_seen: str | None = None
+    last_seen: str | None = None
+    evidence: list[Event] = field(default_factory=list)
