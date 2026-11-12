@@ -57,6 +57,11 @@ class SamplerTests(unittest.TestCase):
             self.assertEqual(rows[0]["cpu_percent"], 20.0)
             self.assertIsNone(rows[0]["gpu_busy_percent"])
             self.assertEqual(db.connection.execute("PRAGMA user_version").fetchone()[0], 2)
+            old_sample = sample.copy()
+            old_sample["captured_at"] = "2000-01-01T00:00:00+00:00"
+            db.add_sample(old_sample)
+            self.assertEqual(db.prune_samples(24), 1)
+            self.assertEqual(len(db.latest_samples(10)), 1)
             db.close()
 
     def test_unsupported_metrics_are_not_reported_as_zero(self):
