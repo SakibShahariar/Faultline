@@ -146,6 +146,7 @@ def run_sampler() -> None:
             settings = load_settings()
             sample, previous_cpu = collect_sample(previous_cpu)
             db.add_sample(sample)
+            db.set_source_status("sampler", True, "Last sample at " + sample["captured_at"])
             samples_since_prune += 1
             if samples_since_prune >= 60:
                 db.prune_samples(settings["sample_retention_hours"])
@@ -155,4 +156,5 @@ def run_sampler() -> None:
     finally:
         signal.signal(signal.SIGTERM, old_term)
         signal.signal(signal.SIGINT, old_int)
+        db.set_source_status("sampler", False, "Background sampler stopped")
         db.close()
