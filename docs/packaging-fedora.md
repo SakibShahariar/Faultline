@@ -29,10 +29,20 @@ rpmbuild -ba packaging/rpm/faultline.spec
 The spec downloads the GitHub archive for the `v0.1.0` tag. The resulting RPM
 is written to `~/rpmbuild/RPMS/noarch/`.
 
-To build the current working tree before creating a release, create a tarball
-whose top-level directory is `Faultline-0.1.0/` and copy it to
-`~/rpmbuild/SOURCES/Faultline-0.1.0.tar.gz`. Then run
-`rpmbuild -ba packaging/rpm/faultline.spec` from the checkout.
+To build the current working tree before creating a release, use the exact
+source archive filename and top-level directory expected by the spec:
+
+```sh
+mkdir -p "$HOME/rpmbuild/SOURCES"
+tar --exclude=.git \
+  --transform='s,^\./,Faultline-0.1.0/,' \
+  -czf "$HOME/rpmbuild/SOURCES/v0.1.0.tar.gz" .
+rpmbuild -ba packaging/rpm/faultline.spec
+```
+
+Run the build command from the repository checkout. This is the same archive
+layout used by the Fedora CI build. The tagged-source workflow above remains
+the recommended path for a release build.
 
 ## Install and enable optional collection
 
