@@ -4,6 +4,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 
 SEVERITY = {
@@ -90,8 +91,11 @@ def main() -> int:
 
     if result.returncode == 0 and result.stdout.strip() == "default":
         try:
+            gui_command = shutil.which("faultline-gui") or str(
+                Path.home() / ".local" / "bin" / "faultline-gui"
+            )
             subprocess.Popen(
-                ["faultline-gui", "--incident-id", args.incident_id],
+                [gui_command, "--incident-id", args.incident_id],
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
