@@ -3,7 +3,7 @@ version: 1
 # AppImageBuilder recipe for Faultline.
 # Build on Ubuntu 24.04 (glibc 2.39) to keep the host ABI baseline conservative.
 # Run from the repository root with APP_VERSION set, for example:
-#   APP_VERSION=0.1.0 appimage-builder --recipe packaging/appimage/AppImageBuilder.yml
+#   APP_VERSION=<project-version> appimage-builder --recipe packaging/appimage/AppImageBuilder.yml
 
 script:
   - |
