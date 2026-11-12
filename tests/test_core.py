@@ -51,6 +51,13 @@ class DiagnosisTests(unittest.TestCase):
         self.assertEqual(finding.category, "oom")
         self.assertEqual(finding.confidence, "moderate")
 
+    def test_detects_userspace_coredump(self):
+        event = Event("c" * 32, "now", "systemd-coredump",
+                      "Process /usr/bin/example produced a coredump (signal 11)",
+                      event_type="coredump")
+        findings = classify([event])
+        self.assertEqual(findings[0].category, "application-crash")
+
 
 class StorageTests(unittest.TestCase):
     def test_database_migrates_and_deduplicates(self):
