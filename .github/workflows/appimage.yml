@@ -72,7 +72,7 @@ jobs:
           ENV DEBIAN_FRONTEND=noninteractive
           RUN apt-get update && apt-get install -y --no-install-recommends \
               ca-certificates coreutils dbus-x11 xvfb xauth weston passwd \
-              && useradd --create-home --uid 1000 smoke \
+              && useradd --create-home --uid 12345 smoke \
               && rm -rf /var/lib/apt/lists/*
           USER smoke
           DOCKERFILE
@@ -82,7 +82,7 @@ jobs:
           appimage="$PWD/Faultline-$APP_VERSION-x86_64.AppImage"
           state="$RUNNER_TEMP/faultline-appimage-state"
           mkdir -p "$state"
-          sudo chown 1000:1000 "$state"
+          sudo chown 12345:12345 "$state"
           docker run --rm --network none \
             --volume "$appimage:/tmp/Faultline.AppImage:ro" \
             --volume "$state:/tmp/state" \
