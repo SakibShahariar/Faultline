@@ -187,7 +187,14 @@ class Database:
             cursor = self.connection.execute(
                 "DELETE FROM samples WHERE captured_at < ?", (cutoff,)
             )
-            return cursor.rowcount
+            expired = cursor.rowcount
+            overflow = self.connection.execute("""
+                DELETE FROM samples
+                WHERE id NOT IN (
+                    SELECT id FROM samples ORDER BY captured_at DESC LIMIT 100000
+                )
+            """).rowcount
+            return expired + overflow
 
     def set_source_status(self, source: str, available: bool, detail: str) -> None:
         with self.connection:
