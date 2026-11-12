@@ -64,16 +64,12 @@ AppDir:
       - gsettings-desktop-schemas
       - dconf-gsettings-backend
       - shared-mime-info
-      # GTK dynamically loads these optional Wayland and graphics backends.
+      # Bundle Wayland/X11 client protocol libraries, but leave the host-specific GL/EGL/GBM/DRM driver stack to the desktop host.
       - libwayland-client0
       - libwayland-cursor0
       - libwayland-egl1
       - libxkbcommon0
       - libxkbcommon-x11-0
-      - libegl1
-      - libgl1
-      - libgbm1
-      - libdrm2
       - libepoxy0
       # GTK's X11 backend also loads XCB extension libraries dynamically.
       - libxcb-render0

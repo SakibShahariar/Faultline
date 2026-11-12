@@ -349,9 +349,30 @@ def inventory(args):
             f"extracted_appdir_bytes={sum(p.stat().st_size for p in appdir.rglob('*') if p.is_file())}\n",
             encoding="utf-8",
         )
+        bundle_manifest = appdir / ".bundle.yml"
+        if bundle_manifest.exists():
+            shutil.copy2(bundle_manifest, output / "bundle.yml")
         status = appdir / "var" / "lib" / "dpkg" / "status"
+        package_names = []
         if status.exists():
             shutil.copy2(status, output / "dpkg-status")
+            package_names = sorted(set(re.findall(
+                r"(?m)^Package: (.+)$",
+                status.read_text(encoding="utf-8", errors="replace"),
+            )))
+            (output / "package-inventory.txt").write_text(
+                "\\n".join(package_names) + "\\n", encoding="utf-8"
+            )
+        print(json.dumps({
+            "shared_library_count": len((output / "shared-libraries.txt").read_text().splitlines()),
+            "typelib_count": len((output / "gi-typelibs.txt").read_text().splitlines()),
+            "package_count": len(package_names),
+            "development_packages": [name for name in package_names if name.endswith("-dev")],
+            "mesa_or_gpu_packages": [
+                name for name in package_names
+                if name.startswith(("mesa-", "libllvm", "libclc", "libvulkan", "libgbm", "libdrm"))
+            ],
+        }, indent=2))
     print(f"Wrote AppImage inventory to {output}")
 
 

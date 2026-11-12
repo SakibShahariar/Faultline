@@ -72,6 +72,7 @@ jobs:
           ENV DEBIAN_FRONTEND=noninteractive
           RUN apt-get update && apt-get install -y --no-install-recommends \
               ca-certificates coreutils dbus-x11 xvfb xauth weston passwd \
+              libegl1 libgl1 libgbm1 libdrm2 \
               && useradd --create-home --uid 12345 smoke \
               && rm -rf /var/lib/apt/lists/*
           USER smoke

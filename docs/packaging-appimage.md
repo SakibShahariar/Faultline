@@ -147,10 +147,13 @@ also requires `strace`. If FUSE mounting is unavailable, the benchmark records
 that limitation and falls back to the AppImage extraction mode; it does not
 pretend that extraction is a mounted-filesystem measurement.
 
+## Graphics driver boundary
+
+The AppDir recipe bundles GTK4/libadwaita/PyGObject and the X11/Wayland client protocol libraries, but leaves GL/EGL/GBM/DRM and Mesa driver components to the host. appimage-builder excludes hardware-specific graphics packages by default; explicitly bundling them can freeze a Mesa stack that conflicts with proprietary or host-updated drivers. The clean smoke-test container therefore supplies host-side GL/EGL/GBM/DRM libraries. A normal desktop Linux host is expected to provide a functioning graphics stack. The recipe also no longer copies a README file that its own documentation exclusion would remove.
+
 ## Compression settings
 
-The build currently uses appimage-builder 1.1.0 and appimagetool 1.9.1. The AppDir recipe avoids bundling the Wayland server library because Faultline is a Wayland client, and it no longer copies a README file that the recipe's own documentation exclusion would remove. The
-builder's v1 recipe schema has no compression field and its appimagetool
+The build currently uses appimage-builder 1.1.0 and appimagetool 1.9.1. The builder's v1 recipe schema has no compression field and its appimagetool
 invocation does not pass a compression override. appimagetool 1.9.1 defaults
 to Zstandard and a 128 KB SquashFS block size; its bundled static
 `mksquashfs` is built with Zstandard support only. The 128 KB block size is
