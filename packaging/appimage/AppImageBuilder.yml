@@ -25,6 +25,10 @@ script:
       "$TARGET_APPDIR/usr/share/applications/io.github.sakibshahariar.Faultline.desktop"
     install -D -m 0644 "$SOURCE_ROOT/packaging/appimage/launch.py" \
       "$TARGET_APPDIR/usr/share/faultline/launch.py"
+    install -d "$TARGET_APPDIR/usr/bin"
+    cc -O2 -Wall -Wextra -Werror \
+      "$SOURCE_ROOT/packaging/appimage/launcher.c" \
+      -o "$TARGET_APPDIR/usr/bin/faultline-app"
     install -d "$TARGET_APPDIR/usr/share/faultline/systemd/user"
     cp -a "$SOURCE_ROOT/data/systemd/user/." \
       "$TARGET_APPDIR/usr/share/faultline/systemd/user/"
@@ -36,8 +40,8 @@ AppDir:
     name: Faultline
     icon: io.github.sakibshahariar.Faultline
     version: "{{APP_VERSION}}"
-    exec: usr/bin/python3
-    exec_args: ${APPDIR}/usr/share/faultline/launch.py $@
+    exec: usr/bin/faultline-app
+    exec_args: $@
   apt:
     arch: [amd64]
     sources:
