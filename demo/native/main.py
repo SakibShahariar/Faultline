@@ -35,9 +35,9 @@ def evidence_detail(event):
 from faultline.presentation import load_boot_summary, load_incidents, load_source_status
 
 
-INCIDENTS = load_incidents()
-BOOT_SUMMARY = load_boot_summary()
-SOURCE_STATUS = load_source_status()
+INCIDENTS = []
+BOOT_SUMMARY = {"count": 0, "current_started": None, "previous_status": None}
+SOURCE_STATUS = {}
 OPEN_INCIDENT_ID = None
 
 
@@ -56,6 +56,10 @@ class FaultlineWindow(Adw.ApplicationWindow):
             vexpand=True,
         )
         self.pages = {}
+        self.data_loading = True
+        self.data_error = None
+        self.recurring_events = []
+        self.latest_sample = None
         self.nav_names = [
             ("overview", "Overview", "view-dashboard-symbolic"),
             ("incidents", "Incidents", "dialog-warning-symbolic"),
@@ -138,6 +142,72 @@ class FaultlineWindow(Adw.ApplicationWindow):
         self.set_content(self.toast_overlay)
 
         nav_list.select_row(self.nav_rows["overview"])
+        self.refresh_data_async()
+
+    def refresh_data_async(self):
+        """Read database-backed view models away from the GTK main thread."""
+        self.data_loading = True
+        self.data_error = None
+
+        def load():
+            from faultline.recurrence import find_recurring_events
+            from faultline.storage import Database
+
+            db = None
+            try:
+                db = Database()
+                samples = db.latest_samples(1)
+                data = {
+                    "incidents": load_incidents(db),
+                    "boot_summary": load_boot_summary(db),
+                    "source_status": load_source_status(db),
+                    "recurring_events": find_recurring_events(db),
+                    "latest_sample": dict(samples[0]) if samples else None,
+                }
+                error = None
+            except Exception as exc:
+                data = None
+                error = str(exc)
+            finally:
+                if db is not None:
+                    db.close()
+            GLib.idle_add(self._data_loaded, data, error)
+
+        threading.Thread(target=load, daemon=True).start()
+
+    def _data_loaded(self, data, error):
+        global INCIDENTS, BOOT_SUMMARY, SOURCE_STATUS
+        self.data_loading = False
+        self.data_error = error
+        if data is not None:
+            INCIDENTS = data["incidents"]
+            BOOT_SUMMARY = data["boot_summary"]
+            SOURCE_STATUS = data["source_status"]
+            self.recurring_events = data["recurring_events"]
+            self.latest_sample = data["latest_sample"]
+        else:
+            INCIDENTS = []
+            BOOT_SUMMARY = {"count": 0, "current_started": None, "previous_status": None}
+            SOURCE_STATUS = {}
+            self.recurring_events = []
+            self.latest_sample = None
+
+        active_page = self.stack.get_visible_child_name() or "overview"
+        for page in list(self.pages.values()):
+            self.stack.remove(page)
+        self.pages = {}
+        self._build_pages()
+        self.show_page(active_page if active_page in self.pages else "overview")
+
+        if OPEN_INCIDENT_ID:
+            incident = next(
+                (item for item in INCIDENTS if item["id"] == OPEN_INCIDENT_ID), None
+            )
+            if incident:
+                self.show_incident(incident)
+        if error:
+            self.toast("Could not load local diagnostic history: " + error)
+        return GLib.SOURCE_REMOVE
 
     def add_page(self, name, title, subtitle=None):
         page = Adw.PreferencesPage()
@@ -181,24 +251,26 @@ class FaultlineWindow(Adw.ApplicationWindow):
 
     def _build_pages(self):
         from faultline.settings import load_settings
-        from faultline.recurrence import find_recurring_events
-        from faultline.storage import Database
 
         settings = load_settings()
-        db = Database()
-        try:
-            recurring_events = find_recurring_events(db)
-            sample_rows = db.latest_samples(1)
-            latest_sample = dict(sample_rows[0]) if sample_rows else None
-        finally:
-            db.close()
+        recurring_events = self.recurring_events
+        latest_sample = self.latest_sample
 
         page = self.add_page("overview", "Overview")
         group = self.group(page, "System status", "Based on records collected from this device.")
-        self.action_row(group, "Diagnostic findings",
-                        f"{len(INCIDENTS)} findings stored" if INCIDENTS else "No findings yet. Run a scan to inspect available records.",
-                        self.status_label("Review" if INCIDENTS else "Not scanned",
-                                          "warning" if INCIDENTS else "dim-label"))
+        finding_summary = (
+            "Loading local diagnostic history…" if self.data_loading else
+            (f"{len(INCIDENTS)} findings stored" if INCIDENTS else
+             ("Could not load local history." if self.data_error else
+              "No findings yet. Run a scan to inspect available records."))
+        )
+        finding_state = (
+            "Loading" if self.data_loading else
+            ("Error" if self.data_error else ("Review" if INCIDENTS else "Not scanned"))
+        )
+        self.action_row(group, "Diagnostic findings", finding_summary,
+                        self.status_label(finding_state,
+                                          "warning" if INCIDENTS or self.data_error else "dim-label"))
         self.action_row(group, "Incident history", "Findings stored in the local database.",
                         Gtk.Label(label=str(len(INCIDENTS))))
         self.action_row(group, "Boot history", "Boot records collected from systemd journal.",
@@ -209,8 +281,20 @@ class FaultlineWindow(Adw.ApplicationWindow):
 
         group = self.group(page, "Recent incidents")
         if not INCIDENTS:
-            self.action_row(group, "No incidents recorded",
-                            "Run Scan to inspect accessible boot journals and coredump metadata.")
+            if self.data_loading:
+                self.action_row(group, "Loading incidents", "Reading the local diagnostic database.")
+            elif self.data_error:
+                self.action_row(group, "Incident history unavailable", self.data_error)
+            else:
+                self.action_row(group, "No incidents recorded",
+                                "Run Scan to inspect accessible boot journals and coredump metadata.")
+        if not INCIDENTS:
+            if self.data_loading:
+                self.action_row(group, "Loading incident history", "Reading stored findings and evidence.")
+            elif self.data_error:
+                self.action_row(group, "Could not load incidents", self.data_error)
+            else:
+                self.action_row(group, "No incidents yet", "Run Scan to collect available diagnostic records.")
         for incident in INCIDENTS:
             self.action_row(
                 group, incident["title"], incident["subtitle"],
@@ -294,8 +378,12 @@ class FaultlineWindow(Adw.ApplicationWindow):
             ]:
                 self.action_row(group, title, subtitle, Gtk.Label(label=value))
         else:
-            self.action_row(group, "No resource samples",
-                            "Enable the optional background sampler in Preferences.")
+            self.action_row(
+                group,
+                "Loading resource history" if self.data_loading else "No resource samples",
+                "Reading local samples…" if self.data_loading else
+                "Enable the optional background sampler in Preferences."
+            )
         group = self.group(page, "Diagnostic sources", "Availability depends on system permissions and configuration.")
         for title, source, fallback in [
             ("Boot journals", "journal", "Not checked"),
@@ -308,7 +396,10 @@ class FaultlineWindow(Adw.ApplicationWindow):
             status = SOURCE_STATUS.get(source)
             disabled = bool(status and status["detail"].startswith("Disabled in Faultline settings"))
             state = ("Disabled" if disabled else
-                     ("Available" if status["available"] else "Unavailable")) if status else fallback
+                     ("Available" if status["available"] else "Unavailable")) if status else (
+                         "Checking…" if self.data_loading else
+                         ("Unavailable" if self.data_error else fallback)
+                     )
             style = ("dim-label" if disabled else
                      ("success" if status and status["available"] else "warning" if status else "dim-label"))
             subtitle = (
@@ -678,13 +769,7 @@ class FaultlineWindow(Adw.ApplicationWindow):
         if error:
             self.toast("Scan failed: " + error)
             return GLib.SOURCE_REMOVE
-        INCIDENTS = load_incidents()
-        BOOT_SUMMARY = load_boot_summary()
-        SOURCE_STATUS = load_source_status()
-        for page in list(self.pages.values()):
-            self.stack.remove(page)
-        self.pages = {}
-        self._build_pages()
+        self.refresh_data_async()
         if result and result["source_errors"]:
             self.toast(f"Scan finished with {len(result['source_errors'])} source warning(s).")
         else:
