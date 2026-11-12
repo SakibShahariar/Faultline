@@ -65,6 +65,23 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(load_boot_summary(self.db)["count"], 1)
         self.assertIn("journal", load_source_status(self.db))
 
+    def test_long_incident_timeline_is_bounded_for_the_ui(self):
+        message = "Out of memory: Killed process 123"
+        events = [
+            Event(
+                self.boot.boot_id,
+                f"2026-11-12T09:{minute:02d}:00+00:00",
+                "kernel",
+                message,
+            )
+            for minute in range(60)
+        ]
+        self.scan_with(lambda _boot_id: iter(events))
+        incident = load_incidents(self.db)[0]
+        self.assertEqual(incident["evidence_count"], 60)
+        self.assertEqual(len(incident["evidence"]), 50)
+        self.assertTrue(incident["evidence_truncated"])
+
     def test_source_status_view_marks_old_checks_as_stale(self):
         self.db.set_source_status("journal", True, "journal is readable")
         self.db.connection.execute(
