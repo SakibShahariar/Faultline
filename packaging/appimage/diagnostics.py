@@ -35,9 +35,10 @@ def run_command(command: list[str], *, env: dict[str, str], timeout: int = 90):
         check=False,
     )
     elapsed = time.perf_counter() - started
+    combined_output = result.stderr + "\\n" + result.stdout
     trace = {
         name: float(value)
-        for name, value in TRACE_RE.findall(result.stderr)
+        for name, value in TRACE_RE.findall(combined_output)
     }
     return {
         "returncode": result.returncode,
@@ -45,6 +46,7 @@ def run_command(command: list[str], *, env: dict[str, str], timeout: int = 90):
         "milestones_seconds": trace,
         "stdout": result.stdout[-4000:],
         "stderr": result.stderr[-8000:],
+        "combined_output": combined_output[-12000:],
     }
 
 
@@ -222,7 +224,7 @@ def benchmark(args):
                         raise RuntimeError(
                             f"{mode_name} trial {index + 1} exited without reaching "
                             f"the main-window-mapped milestone; this is not a valid "
-                            f"GUI startup sample. stderr: {sample['stderr'][-3000:]}"
+                            f"GUI startup sample. output: {sample['combined_output'][-5000:]}"
                         )
 
             for mode_name, samples in samples_by_mode.items():
