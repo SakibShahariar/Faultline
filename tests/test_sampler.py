@@ -67,7 +67,7 @@ class SamplerTests(unittest.TestCase):
             self.assertEqual(len(rows), 1)
             self.assertEqual(rows[0]["cpu_percent"], 20.0)
             self.assertIsNone(rows[0]["gpu_busy_percent"])
-            self.assertEqual(db.connection.execute("PRAGMA user_version").fetchone()[0], 3)
+            self.assertEqual(db.connection.execute("PRAGMA user_version").fetchone()[0], 4)
             old_sample = sample.copy()
             old_sample["captured_at"] = "2000-01-01T00:00:00+00:00"
             db.add_sample(old_sample)
