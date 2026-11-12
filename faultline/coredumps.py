@@ -11,6 +11,25 @@ from .signatures import signature_for
 from .sources import SourceError, _run
 
 _BOOT_ID = re.compile(r"^[0-9a-fA-F]{32}$")
+_SECRET_ARGUMENT = re.compile(
+    r"(?i)(--?(?:token|password|passwd|secret|api[-_]key)=)([^\\s]+)"
+)
+
+
+def _text(value: Any) -> str:
+    if isinstance(value, list):
+        return " ".join(
+            item.decode("utf-8", errors="replace") if isinstance(item, bytes) else str(item)
+            for item in value
+        )
+    return str(value)
+
+
+def _safe_command(value: Any) -> str | None:
+    if value in (None, ""):
+        return None
+    command = _text(value)[:2000]
+    return _SECRET_ARGUMENT.sub(r"\\1<redacted>", command)
 
 
 def _first(record: dict[str, Any], *names: str) -> Any:
@@ -45,6 +64,8 @@ def parse_coredump_json(payload: str) -> list[Event]:
         executable = str(_first(record, "COREDUMP_EXE", "exe", "EXE") or "unknown executable")
         signal = str(_first(record, "COREDUMP_SIGNAL", "signal", "SIGNAL") or "unknown signal")
         pid = _first(record, "COREDUMP_PID", "pid", "PID")
+        uid = _first(record, "COREDUMP_UID", "uid", "UID")
+        command = _safe_command(_first(record, "COREDUMP_CMDLINE", "cmdline", "CMDLINE"))
         raw_timestamp = _first(record, "COREDUMP_TIMESTAMP", "timestamp", "TIME")
         timestamp = "unknown"
         if raw_timestamp is not None:
@@ -60,8 +81,13 @@ def parse_coredump_json(payload: str) -> list[Event]:
             boot_id=boot_id, timestamp=timestamp, source="systemd-coredump",
             message=message, event_type="coredump",
             signature=signature_for(f"{executable}:{signal}", "systemd-coredump"),
-            metadata={"executable": executable, "signal": signal,
-                      "pid": str(pid) if pid is not None else None},
+            metadata={
+                "executable": executable,
+                "signal": signal,
+                "pid": str(pid) if pid is not None else None,
+                "uid": str(uid) if uid is not None else None,
+                "command": command,
+            },
         ))
     return events
 
