@@ -230,5 +230,14 @@ class Database:
                 )
         return len(expired)
 
+    def clear_history(self) -> None:
+        """Delete diagnostic records while preserving user preferences."""
+        with self.connection:
+            self.connection.execute("DELETE FROM samples")
+            self.connection.execute("DELETE FROM findings")
+            self.connection.execute("DELETE FROM events")
+            self.connection.execute("DELETE FROM boots")
+            self.connection.execute("DELETE FROM source_status")
+
     def close(self) -> None:
         self.connection.close()
