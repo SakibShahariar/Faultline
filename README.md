@@ -1,39 +1,38 @@
 # Faultline
 
-**Linux crash diagnosis & system forensics**
+**Linux crash diagnosis and system forensics**
 
-Faultline is a planned native GTK4/libadwaita application for understanding Linux crashes, unexpected shutdowns, and desktop failures. It correlates system logs, coredumps, boot records, and optional resource history to present evidence-based explanations.
+Faultline is a planned native GTK4/libadwaita application for understanding Linux crashes, unexpected shutdowns, and desktop failures. It will correlate system logs, coredumps, boot records, and optional resource history to present evidence-based explanations.
 
-## UI concept
+## Interface prototype
 
-The interactive prototype lives in [`demo/index.html`](demo/index.html).
+Open the [interactive UI prototype](demo/index.html) in a browser.
 
-It is a browser-based design prototype, not the application itself. Open the file in a browser to explore the screens and interactions. All displayed incidents, system metrics, extensions, and timestamps are illustrative sample data; the prototype does not inspect or modify the host system.
+The prototype follows GNOME/libadwaita design conventions more closely than a generic web dashboard: a compact header bar, navigation sidebar, restrained Adwaita-style surfaces, clear status indicators, responsive layouts, and preference rows. It is still a standalone HTML/CSS/JavaScript prototype—not a native GTK application and not a pixel-perfect reproduction of libadwaita widgets.
 
-### Screens and windows represented
+All incidents, system metrics, extension activity, and timestamps shown are fictional sample data. Buttons and controls demonstrate navigation and interaction only; the prototype does not inspect or modify the host system.
 
-- **Overview** — system stability summary, recent incidents, resource snapshot, and attention items.
+### Screens and flows
+
+- **Overview** — system stability, recent incidents, resource snapshot, and findings that need attention.
 - **Incidents** — searchable and filterable incident history.
-- **Incident details** — evidence, event timeline, confidence, possible causes, related incidents, and suggested next steps.
-- **System health** — resource history, kernel/storage/GPU/thermal signals, and collection status.
-- **Extensions** — GNOME Shell and extension log correlation, with clear distinction between correlation and proof.
-- **Reports** — locally saved reports and export privacy guidance.
-- **Preferences** — general behavior, collection settings, privacy, notifications, and storage.
-- **First-run setup** — introduction to log inspection and optional monitoring.
-- **Diagnostic access dialog** — explains data-source permissions and access limitations.
-- **Report export dialog** — selectable report sections and redaction controls.
-- **Other dialogs** — scan confirmation, monitoring configuration, data clearing, and About.
+- **Incident details** — evidence timeline, interpretation, confidence, possible explanations, and next steps.
+- **System health** — resource history and availability of diagnostic sources.
+- **GNOME extensions** — extension activity around Shell incidents, with correlation clearly separated from proof.
+- **Reports** — report creation and privacy guidance.
+- **Preferences** — general behavior, collection, privacy, notifications, and storage.
+- **Dialogs** — scan, monitoring, report export, data clearing, and About.
 
 ## Product direction
 
-The prototype is a visual and interaction roadmap for the native application. The intended implementation is:
+The prototype is an interaction and layout roadmap for the native application. The intended implementation is:
 
 - GTK4 and libadwaita for the desktop interface.
 - A small background collector, separate from the GUI.
 - Local SQLite storage under `~/.local/share/faultline/`.
 - Existing system sources such as previous-boot journals, `coredumpctl`, kernel messages, pstore when available, and GNOME Shell logs.
 - Optional lightweight resource sampling with configurable retention.
-- Rule-based diagnosis that shows supporting evidence and confidence instead of claiming an unverified root cause.
+- Rule-based diagnosis that presents supporting evidence and confidence instead of claiming an unverified root cause.
 - Local-first reports with preview and explicit redaction before sharing.
 
 ### Important constraints
@@ -42,4 +41,4 @@ Some diagnostic sources are not readable by an ordinary user on every distributi
 
 ## Development status
 
-The repository currently contains the UI concept only. The native application, collector, database, and real diagnostic engine are not implemented yet.
+The repository currently contains a browser-based interface prototype and product roadmap. The native application, collector, database, and real diagnostic engine are not implemented yet.
