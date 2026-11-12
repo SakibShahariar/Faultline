@@ -17,7 +17,7 @@ _ERROR_MARKERS = re.compile(
     re.IGNORECASE,
 )
 _SHELL_FAILURE = re.compile(
-    r"(?:gnome-shell|mutter).*(?:segfault|crash|core dumped|terminated|status=11)",
+    r"(?:gnome-shell|mutter).*(?:segfault|crash|core dumped|terminated|status=11|code=dumped|signal 11|sigsegv)",
     re.IGNORECASE,
 )
 
