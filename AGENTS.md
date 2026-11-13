@@ -20,3 +20,19 @@ Generate `SHA256SUMS` once, after both final distributable packages are availabl
 Avoid having separate packaging workflows race to upload or overwrite the same release assets. Use a single coordinated release-asset publishing step/workflow so the three public assets are attached once. If an asset with the intended name already exists, handle that deliberately and idempotently rather than failing the release with a duplicate-upload error.
 
 Before declaring a release complete, verify that the GitHub Release contains exactly the two installers and the single combined `SHA256SUMS` file, and that the manifest checksums match the uploaded files.
+
+## Commit messages
+
+Use Conventional Commits for all new commits:
+
+```text
+type(scope): imperative description (#issue)
+```
+
+- Use a specific type: `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `build`, `ci`, or `chore`.
+- Use a concise scope naming the affected component or area, such as `scanner`, `extensions`, `ui`, `packaging`, or `release`.
+- Write a clear, specific description in the imperative mood. Explain what the commit changes; avoid vague messages.
+- Include the related issue number in parentheses at the end whenever the commit addresses an existing issue, for example: `fix(extensions): clarify related incident titles (#31)`.
+- Do not invent issue numbers. Omit the issue reference for standalone work that does not address an existing issue.
+- Keep the subject concise and consistent. Do not use square-bracket issue prefixes such as `[#31]`.
+- Do not rewrite published commit history solely to change message formatting; apply this convention to all new commits.
