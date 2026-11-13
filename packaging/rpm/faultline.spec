@@ -1,5 +1,5 @@
 Name:           faultline
-Version:        0.1.3
+Version:        0.1.4
 Release:        1%{?dist}
 Summary:        Local-first Linux crash diagnosis and system forensics
 License:        MIT
@@ -55,9 +55,9 @@ python3 -m compileall -q faultline tests demo/native
 %{_userunitdir}/faultline-sampler.service
 
 %changelog
-* Fri Nov 13 2026 Sakib Shahariar <74959773+SakibShahariar@users.noreply.github.com> - 0.1.3-1
-- Refresh the native GTK dashboard and Fedora 45 package
-- Validate the RPM and AppImage builds against the same source revision
+* Fri Nov 13 2026 Sakib Shahariar <74959773+SakibShahariar@users.noreply.github.com> - 0.1.4-1
+- Improve responsive window sizing and GNOME extension inventory presentation
+- Validate native GTK, Fedora RPM, and AppImage builds
 
 * Thu Nov 12 2026 Sakib Shahariar <74959773+SakibShahariar@users.noreply.github.com> - 0.1.2-1
 - Prepare the Fedora 45 package for the v0.1.2 release
