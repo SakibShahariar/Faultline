@@ -390,15 +390,33 @@ class FaultlineWindow(Adw.ApplicationWindow):
             incident for incident in INCIDENTS
             if incident["category"] == "extension-error"
         ]
+        extension_names = {
+            extension["uuid"]: extension["name"]
+            for extension in extension_inventory
+        }
         incidents_group = self.group(page, f"Related incidents ({len(extension_incidents)})")
         if extension_incidents:
             for incident in extension_incidents:
-                self.action_row(
-                    incidents_group, incident["title"], incident["subtitle"],
+                full_title = incident["title"]
+                prefix = "Extension error near a Shell/Mutter failure: "
+                extension_id = (
+                    full_title[len(prefix):].rsplit(" (", 1)[0]
+                    if full_title.startswith(prefix) else None
+                )
+                extension_name = extension_names.get(extension_id)
+                short_title = (
+                    f"{extension_name} error"
+                    if extension_name else "Extension error"
+                )
+                row = self.action_row(
+                    incidents_group, short_title, incident["subtitle"],
                     self.status_label("Open incident", "warning"),
                     "application-x-addon-symbolic",
                     lambda *_args, item=incident: self.show_incident(item),
                 )
+                # Keep the complete diagnostic title available without forcing
+                # long extension UUIDs and timestamps into the list layout.
+                row.set_tooltip_text(full_title)
         else:
             self.action_row(incidents_group, "No related incidents")
 
