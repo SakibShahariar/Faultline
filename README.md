@@ -8,6 +8,10 @@ coredump metadata, kernel/pstore records, and GNOME Shell/Mutter failures. Findi
 retain their supporting events and uncertainty: correlation is not presented as
 proof of causation.
 
+## Screenshot
+
+![Faultline application overview](docs/images/faultline-overview.png)
+
 ## Current capabilities
 
 - Boot history and conservative unexpected-shutdown assessment.
