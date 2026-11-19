@@ -6,18 +6,24 @@ on:
   workflow_run:
     workflows: ["AppImage", "Fedora RPM"]
     types: [completed]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Stage and verify assets without publishing a release"
+        type: boolean
+        default: true
 
 permissions:
   contents: write
   actions: read
 
 concurrency:
-  group: faultline-publish-${{ github.event.workflow_run.head_sha }}
+  group: faultline-publish-${{ github.event.workflow_run.head_sha || github.sha }}
   cancel-in-progress: false
 
 jobs:
   publish:
-    if: github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,10 +33,21 @@ jobs:
       - name: Resolve tag and version
         id: version
         run: |
+          version="$(sed -n 's/^version = "\(.*\)"$/\1/p' pyproject.toml | head -n1)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "verify=true" >> "$GITHUB_OUTPUT"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "dry_run=true" >> "$GITHUB_OUTPUT"
+            echo "Dispatched dry run for version $version; no release will be published."
+            exit 0
+          fi
           sha="${{ github.event.workflow_run.head_sha }}"
           tag="$(git tag --points-at "$sha" | head -n 1)"
           if [[ "$tag" != v* ]]; then
+            echo "verify=false" >> "$GITHUB_OUTPUT"
             echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "dry_run=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           version="${tag#v}"
@@ -39,23 +56,34 @@ jobs:
             echo "Tag $tag does not match pyproject.toml version $project_version" >&2
             exit 1
           fi
+          echo "verify=true" >> "$GITHUB_OUTPUT"
           echo "publish=true" >> "$GITHUB_OUTPUT"
+          echo "dry_run=false" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Wait for both build workflows
-        if: steps.version.outputs.publish == 'true'
+        if: steps.version.outputs.verify == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
-          SHA: ${{ github.event.workflow_run.head_sha }}
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          DRY_RUN: ${{ steps.version.outputs.dry_run }}
         run: |
+          successful_run_id() {
+            if [[ "$DRY_RUN" == "true" ]]; then
+              gh run list --workflow "$1" --status success --limit 1 \
+                --json databaseId --jq '.[0].databaseId'
+            else
+              gh run list --workflow "$1" --commit "$SHA" --status success \
+                --json databaseId --jq '.[0].databaseId'
+            fi
+          }
           for attempt in $(seq 1 60); do
             ready=1
             for workflow in appimage.yml rpm.yml; do
-              count="$(gh run list --workflow "$workflow" --commit "$SHA" \
-                --status success --json databaseId --jq 'length')"
-              [[ "$count" -gt 0 ]] || ready=0
+              run_id="$(successful_run_id "$workflow")"
+              [[ -n "$run_id" ]] || ready=0
             done
             [[ "$ready" -eq 1 ]] && break
             sleep 10
@@ -66,18 +94,27 @@ jobs:
           }
 
       - name: Download build artifacts
-        if: steps.version.outputs.publish == 'true'
+        if: steps.version.outputs.verify == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
-          SHA: ${{ github.event.workflow_run.head_sha }}
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
           VERSION: ${{ steps.version.outputs.version }}
+          DRY_RUN: ${{ steps.version.outputs.dry_run }}
         run: |
+          successful_run_id() {
+            if [[ "$DRY_RUN" == "true" ]]; then
+              gh run list --workflow "$1" --status success --limit 1 \
+                --json databaseId --jq '.[0].databaseId'
+            else
+              gh run list --workflow "$1" --commit "$SHA" --status success \
+                --json databaseId --jq '.[0].databaseId'
+            fi
+          }
           fetch_artifact() {
             local workflow="$1" name="$2" destination="$3"
             local run_id artifact_id
-            run_id="$(gh run list --workflow "$workflow" --commit "$SHA" \
-              --status success --json databaseId --jq '.[0].databaseId')"
+            run_id="$(successful_run_id "$workflow")"
             test -n "$run_id"
             artifact_id="$(gh api "repos/$GH_REPO/actions/runs/$run_id/artifacts" \
               --jq ".artifacts[] | select(.name == \"$name\") | .id" | head -n1)"
@@ -92,7 +129,7 @@ jobs:
 
       - name: Stage and verify the three public assets
         id: stage
-        if: steps.version.outputs.publish == 'true'
+        if: steps.version.outputs.verify == 'true'
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
