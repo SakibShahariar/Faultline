@@ -485,6 +485,12 @@ def profile(args):
                         "traced": traced,
                         "wall_seconds": round(wall_seconds, 3),
                         "gtk_import_seconds": trace["GTK imported"],
+                        "construction_started_seconds": trace.get(
+                            "window construction started", 0.0
+                        ),
+                        "window_constructed_seconds": trace.get(
+                            "window constructed", 0.0
+                        ),
                         "window_mapped_seconds": trace["main window mapped"],
                         "strace_summary": syscall_summary,
                     })
@@ -519,6 +525,18 @@ def profile(args):
             f"main window mapped {first['window_mapped_seconds']:.3f}s; "
             f"traced={mode['traced']}; fallback={mode['fallback_used']}"
         )
+        phases = [
+            ("Python entry to GTK import", 0.0, first["gtk_import_seconds"]),
+            ("GTK import to window construction", first["gtk_import_seconds"],
+             first["construction_started_seconds"]),
+            ("Window construction", first["construction_started_seconds"],
+             first["window_constructed_seconds"]),
+            ("Window construction to mapped", first["window_constructed_seconds"],
+             first["window_mapped_seconds"]),
+        ]
+        for label, start, end in phases:
+            if end > start:
+                print(f"  {label}: {end - start:.3f}s")
     print(f"Wrote startup profiles to {output}")
 
 def inventory(args):

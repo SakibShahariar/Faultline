@@ -179,6 +179,15 @@ whether the mount was available, which modes were traced, and whether any run
 fell back to extraction. A fallback is labeled explicitly and is never
 reported as a normal mounted-runtime result.
 
+The report breaks the first trial into startup phases (entry to GTK import, GTK
+import to window construction, window construction, and construction to mapped)
+so import cost can be separated from application layout work. A local
+extracted-AppDir validation on 2026-11-19 showed filesystem probing
+(`newfstatat`, `openat`, `statx`, `readlink`) dominating syscall time, with the
+user's `~/.config/gtk-4.0/gtk.css` as the single most expensive path and window
+construction taking about 0.6–0.7 s. That is a directional local sample, not a
+CI-grade measurement; review a fresh CI artifact before changing the bundle.
+
 ## Graphics driver boundary
 
 The AppDir recipe bundles GTK4/libadwaita/PyGObject and the X11/Wayland client protocol libraries, but leaves GL/EGL/GBM/DRM and Mesa driver components to the host. appimage-builder excludes hardware-specific graphics packages by default; explicitly bundling them can freeze a Mesa stack that conflicts with proprietary or host-updated drivers. The clean smoke-test container therefore supplies host-side GL/EGL/GBM/DRM libraries. A normal desktop Linux host is expected to provide a functioning graphics stack. The recipe also no longer copies a README file that its own documentation exclusion would remove.
