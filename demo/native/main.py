@@ -118,6 +118,7 @@ class FaultlineWindow(Adw.ApplicationWindow):
         scan_button = Gtk.Button(child=scan_content)
         self.scan_button = scan_button
         scan_button.add_css_class("suggested-action")
+        scan_button.set_tooltip_text("Scan diagnostic sources (Ctrl+R)")
         scan_button.connect("clicked", self.scan_dialog)
         header.pack_end(scan_button)
 

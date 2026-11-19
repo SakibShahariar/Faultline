@@ -55,6 +55,11 @@ python3 -m venv --system-site-packages .venv
 .venv/bin/faultline-gui
 ```
 
+### Keyboard shortcuts
+
+- `Ctrl+K` or `Ctrl+F` — focus incident search; `Esc` closes it.
+- `Ctrl+R` — start a diagnostic scan.
+
 Run automated checks:
 
 ```sh
