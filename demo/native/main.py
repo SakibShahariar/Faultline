@@ -30,7 +30,7 @@ gi.require_version("Adw", "1")
 startup_trace("GTK and libadwaita versions selected")
 from gi.repository import Gtk
 startup_trace("GTK imported")
-from gi.repository import Adw, Gio, GLib
+from gi.repository import Adw, Gdk, Gio, GLib
 startup_trace("libadwaita imported")
 
 
@@ -73,8 +73,10 @@ class FaultlineWindow(Adw.ApplicationWindow):
         self.pages = {}
         self.data_loading = True
         self.data_error = None
+        self.scanning = False
         self.recurring_events = []
         self.latest_sample = None
+        self.incident_filter = ""
         # Ship our own symbolic navigation icons so they remain available even
         # when the host uses a minimal or incomplete icon theme.
         icon_theme = Gtk.IconTheme.get_for_display(self.get_display())
@@ -93,11 +95,19 @@ class FaultlineWindow(Adw.ApplicationWindow):
 
         header = Adw.HeaderBar()
         header.set_title_widget(self.window_title)
-        search_button = Gtk.Button.new_from_icon_name("system-search-symbolic")
-        search_button.set_tooltip_text("Search incidents")
-        search_button.add_css_class("flat")
-        search_button.connect("clicked", lambda *_: self.show_page("incidents"))
-        header.pack_end(search_button)
+        self.search_button = Gtk.ToggleButton()
+        self.search_button.set_child(Gtk.Image.new_from_icon_name("system-search-symbolic"))
+        self.search_button.set_tooltip_text("Search incidents (Ctrl+K)")
+        self.search_button.add_css_class("flat")
+        self.search_button.connect("toggled", self.on_search_toggled)
+        header.pack_end(self.search_button)
+        self.search_entry = Gtk.SearchEntry()
+        self.search_entry.set_placeholder_text("Search incident titles and details")
+        self.search_entry.connect("search-changed", self.on_search_changed)
+        self.search_revealer = Gtk.Revealer()
+        self.search_revealer.set_transition_type(Gtk.RevealerTransitionType.SLIDE_LEFT)
+        self.search_revealer.set_child(self.search_entry)
+        header.pack_start(self.search_revealer)
 
         scan_content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         self.scan_spinner = Gtk.Spinner()
@@ -160,6 +170,7 @@ class FaultlineWindow(Adw.ApplicationWindow):
         self.toast_overlay.set_child(split)
         self.set_content(self.toast_overlay)
         self.connect("map", lambda *_args: startup_trace("main window mapped"))
+        self._install_shortcuts()
         startup_trace("window constructed")
 
         nav_list.select_row(self.nav_rows["overview"])
@@ -273,6 +284,94 @@ class FaultlineWindow(Adw.ApplicationWindow):
         label.add_css_class(style)
         return label
 
+    def _build_incidents_page(self):
+        query = self.incident_filter
+        visible = [
+            incident for incident in INCIDENTS
+            if not query or query in " ".join(str(incident.get(field) or "") for field in (
+                "title", "subtitle", "detail"
+            )).lower()
+        ]
+        if not visible:
+            if query:
+                title = "No matching incidents"
+                description = f"No stored finding matches '{query}'. Clear the search to see every incident."
+                icon = "system-search-symbolic"
+            elif self.data_loading:
+                title = "Loading incidents…"
+                description = "Reading local diagnostic history."
+                icon = "content-loading-symbolic"
+            elif self.data_error:
+                title = "Incident history unavailable"
+                description = "Stored diagnostic history could not be read."
+                icon = "dialog-error-symbolic"
+            else:
+                title = "No findings yet"
+                description = "Run a scan to inspect available boot journals and optional diagnostic sources."
+                icon = "emblem-system-symbolic"
+            empty = Adw.StatusPage(title=title, description=description, icon_name=icon)
+            empty.set_vexpand(True)
+            self.stack.add_named(empty, "incidents")
+            self.pages["incidents"] = empty
+            return
+
+        page = self.add_page("incidents", "Incidents")
+        group = self.group(page, "Incident history", "Select an incident to inspect its evidence.")
+        for incident in visible:
+            self.action_row(
+                group, incident["title"], incident["subtitle"],
+                self.status_label(incident["severity"], self.severity_style(incident["severity"])),
+                incident["icon"],
+                lambda _row, item=incident: self.show_incident(item),
+            )
+
+    def set_incident_filter(self, text):
+        query = text.strip().lower()
+        if query == self.incident_filter:
+            return
+        self.incident_filter = query
+        active = self.stack.get_visible_child_name()
+        previous = self.pages.get("incidents")
+        if previous is not None:
+            self.stack.remove(previous)
+        self._build_incidents_page()
+        if active == "incidents":
+            self.stack.set_visible_child_name("incidents")
+
+    def on_search_changed(self, entry):
+        self.set_incident_filter(entry.get_text())
+
+    def toggle_search(self):
+        self.search_button.set_active(not self.search_button.get_active())
+
+    def close_search(self):
+        if self.search_button.get_active():
+            self.search_button.set_active(False)
+
+    def on_search_toggled(self, button):
+        revealed = button.get_active()
+        self.search_revealer.set_reveal_child(revealed)
+        if revealed:
+            self.show_page("incidents")
+            self.search_entry.grab_focus()
+        else:
+            self.search_entry.set_text("")
+
+    def _install_shortcuts(self):
+        controller = Gtk.ShortcutController()
+        controller.set_scope(Gtk.ShortcutScope.GLOBAL)
+
+        def bind(key, callback, mask=Gdk.ModifierType.CONTROL_MASK):
+            trigger = Gtk.KeyvalTrigger.new(key, mask)
+            action = Gtk.CallbackAction.new(lambda *_args: callback())
+            controller.add_shortcut(Gtk.Shortcut.new(trigger, action))
+
+        bind(Gdk.KEY_k, self.toggle_search)
+        bind(Gdk.KEY_f, self.toggle_search)
+        bind(Gdk.KEY_r, self.scan_dialog)
+        bind(Gdk.KEY_Escape, self.close_search, Gdk.ModifierType.NO_MODIFIER_MASK)
+        self.add_controller(controller)
+
     def _build_pages(self):
         from faultline.settings import load_settings
 
@@ -286,15 +385,7 @@ class FaultlineWindow(Adw.ApplicationWindow):
         self.stack.add_named(overview, "overview")
         self.pages["overview"] = overview
 
-        page = self.add_page("incidents", "Incidents")
-        group = self.group(page, "Incident history", "Select an incident to inspect its evidence.")
-        for incident in INCIDENTS:
-            self.action_row(
-                group, incident["title"], incident["subtitle"],
-                self.status_label(incident["severity"], self.severity_style(incident["severity"])),
-                incident["icon"],
-                lambda _row, item=incident: self.show_incident(item),
-            )
+        self._build_incidents_page()
 
         page = self.add_page("health", "System health")
         group = self.group(
@@ -831,6 +922,7 @@ class FaultlineWindow(Adw.ApplicationWindow):
             threading.Thread(target=self._run_scan, daemon=True).start()
 
     def _set_scan_running(self, running):
+        self.scanning = running
         self.scan_button.set_sensitive(not running)
         self.scan_label.set_text("Scanning…" if running else "Scan")
         self.scan_spinner.set_visible(running)
@@ -838,6 +930,21 @@ class FaultlineWindow(Adw.ApplicationWindow):
             self.scan_spinner.start()
         else:
             self.scan_spinner.stop()
+        self._refresh_overview()
+
+    def _refresh_overview(self):
+        """Rebuild just the dashboard so transient scan state stays visible."""
+        from faultline.overview import build_overview
+
+        active = self.stack.get_visible_child_name()
+        previous = self.pages.get("overview")
+        if previous is not None:
+            self.stack.remove(previous)
+        overview = build_overview(self, INCIDENTS, BOOT_SUMMARY, SOURCE_STATUS)
+        self.stack.add_named(overview, "overview")
+        self.pages["overview"] = overview
+        if active == "overview":
+            self.stack.set_visible_child_name("overview")
 
     def _run_scan(self):
         try:

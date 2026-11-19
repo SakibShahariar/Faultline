@@ -109,7 +109,12 @@ def build_overview(window, incidents, boot_summary, source_status):
     ))
     root.append(intro)
 
-    if window.data_loading:
+    scanning = bool(getattr(window, "scanning", False))
+    if scanning:
+        state_text = "Scanning diagnostic sources…"
+        state_style = "accent"
+        state_icon = "content-loading-symbolic"
+    elif window.data_loading:
         state_text = "Loading your local diagnostic history…"
         state_style = "dim-label"
         state_icon = "content-loading-symbolic"
@@ -135,6 +140,10 @@ def build_overview(window, incidents, boot_summary, source_status):
     status_icon = Gtk.Image.new_from_icon_name(state_icon)
     status_icon.set_pixel_size(24)
     status_content.append(status_icon)
+    if scanning:
+        spinner = Gtk.Spinner()
+        spinner.start()
+        status_content.append(spinner)
     status_label = _label(state_text, state_style, wrap=True)
     status_label.set_hexpand(True)
     status_content.append(status_label)

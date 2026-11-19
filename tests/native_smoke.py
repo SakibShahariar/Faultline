@@ -62,6 +62,40 @@ for _name, _label, icon_name in window.nav_names:
 assert all(isinstance(row, module.Adw.ActionRow) for row in window.nav_rows.values()), (
     "Navigation entries should be Adw.ActionRow instances"
 )
+
+# Incident search filters the list and uses an Adwaita status page for empty results.
+module.INCIDENTS = [{
+    "id": "FL-100",
+    "title": "Kernel panic after update",
+    "subtitle": "Boot 12",
+    "detail": "A kernel panic was recorded.",
+    "severity": "High",
+    "icon": "dialog-warning-symbolic",
+}, {
+    "id": "FL-101",
+    "title": "Unexpected shutdown",
+    "subtitle": "Boot 11",
+    "detail": "Power loss suspected.",
+    "severity": "Low",
+    "icon": "dialog-warning-symbolic",
+}]
+window.data_loading = False
+window.data_error = None
+window.set_incident_filter("panic")
+assert isinstance(window.pages["incidents"], module.Adw.PreferencesPage)
+assert sum(isinstance(item, module.Adw.ActionRow) for item in walk(window.pages["incidents"])) == 1
+window.set_incident_filter("no-such-incident")
+assert isinstance(window.pages["incidents"], module.Adw.StatusPage), (
+    "No search matches should show an Adwaita status page"
+)
+window.set_incident_filter("")
+window.toggle_search()
+assert window.search_button.get_active()
+assert window.search_revealer.get_reveal_child()
+window.close_search()
+assert not window.search_button.get_active()
+assert window.incident_filter == ""
+
 assert window.get_visible(), "Faultline main window is not visible"
 assert window.scan_label.get_text() == "Scan"
 assert not window.scan_spinner.get_visible()
@@ -70,10 +104,14 @@ assert not window.scan_button.get_sensitive()
 assert window.scan_spinner.get_visible()
 assert window.scan_spinner.get_spinning()
 assert window.scan_label.get_text() == "Scanning…"
+assert any(isinstance(item, module.Gtk.Spinner) for item in walk(window.pages["overview"])), (
+    "Scan progress should also appear on the dashboard"
+)
 window._set_scan_running(False)
 assert window.scan_button.get_sensitive()
 assert not window.scan_spinner.get_visible()
 assert window.scan_label.get_text() == "Scan"
+assert not any(isinstance(item, module.Gtk.Spinner) for item in walk(window.pages["overview"]))
 messages = []
 window.refresh_data_async = lambda: None
 window.toast = messages.append
