@@ -571,23 +571,28 @@ class FaultlineWindow(Adw.ApplicationWindow):
         dialog.choose(self, None, self.clear_history_finished)
 
     def clear_history_finished(self, dialog, result):
+        global INCIDENTS, BOOT_SUMMARY, SOURCE_STATUS
         try:
             response = dialog.choose_finish(result)
         except Exception:
             return
         if response != "clear":
             return
+        from faultline.presentation import (
+            load_boot_summary,
+            load_incidents,
+            load_source_status,
+        )
         from faultline.storage import Database
 
         db = Database()
         try:
             db.clear_history()
+            INCIDENTS = load_incidents(db)
+            BOOT_SUMMARY = load_boot_summary(db)
+            SOURCE_STATUS = load_source_status(db)
         finally:
             db.close()
-        global INCIDENTS, BOOT_SUMMARY, SOURCE_STATUS
-        INCIDENTS = load_incidents()
-        BOOT_SUMMARY = load_boot_summary()
-        SOURCE_STATUS = load_source_status()
         for page in list(self.pages.values()):
             self.stack.remove(page)
         self.pages = {}
