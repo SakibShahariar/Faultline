@@ -1,4 +1,4 @@
-"""Responsive GTK overview dashboard for Faultline."""
+"""Responsive libadwaita overview dashboard for Faultline."""
 from __future__ import annotations
 
 from gi.repository import Adw, Gtk
@@ -13,32 +13,43 @@ def _label(text, style=None, *, wrap=False, xalign=0):
     return label
 
 
+def _content_row(text, style="dim-label"):
+    """A non-interactive Adwaita row for empty-state and explanatory text."""
+    label = _label(text, style, wrap=True)
+    label.set_margin_top(12)
+    label.set_margin_bottom(12)
+    label.set_margin_start(16)
+    label.set_margin_end(16)
+    row = Adw.PreferencesRow()
+    row.set_child(label)
+    return row
+
+
 def _card(title, subtitle=None):
-    frame = Gtk.Frame()
-    frame.add_css_class("card")
-    frame.add_css_class("overview-card")
-    content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-    content.set_margin_top(16)
-    content.set_margin_bottom(16)
-    content.set_margin_start(14)
-    content.set_margin_end(14)
-    heading = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
-    heading.append(_label(title, "heading"))
+    """A titled Adwaita group that provides the card background and spacing."""
+    group = Adw.PreferencesGroup()
+    group.set_title(title)
     if subtitle:
-        heading.append(_label(subtitle, "dim-label", wrap=True))
-    content.append(heading)
-    frame.set_child(content)
-    return frame, content
+        group.set_description(subtitle)
+    return group
 
 
 def _metric(title, value, detail, style=None):
-    frame, content = _card(title)
+    group = _card(title)
+    content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+    content.set_margin_top(10)
+    content.set_margin_bottom(12)
+    content.set_margin_start(16)
+    content.set_margin_end(16)
     value_label = _label(value, "title-1")
     if style:
         value_label.add_css_class(style)
     content.append(value_label)
     content.append(_label(detail, "dim-label", wrap=True))
-    return frame
+    row = Adw.PreferencesRow()
+    row.set_child(content)
+    group.add(row)
+    return group
 
 
 def _flow(columns=2):
@@ -50,34 +61,24 @@ def _flow(columns=2):
     flow.set_row_spacing(14)
     flow.set_column_spacing(14)
     flow.set_activate_on_single_click(False)
-    flow.add_css_class("overview-grid")
     return flow
 
 
 def _append_row(container, title, subtitle=None, suffix=None, callback=None, icon=None):
-    button = Gtk.Button()
-    button.add_css_class("flat")
-    button.set_halign(Gtk.Align.FILL)
-    button.set_hexpand(True)
-    row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-    row.set_margin_top(8)
-    row.set_margin_bottom(8)
+    row = Adw.ActionRow()
+    row.set_title(title)
+    if subtitle:
+        row.set_subtitle(subtitle)
     if icon:
         image = Gtk.Image.new_from_icon_name(icon)
-        image.set_pixel_size(18)
-        row.append(image)
-    text_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
-    text_box.set_hexpand(True)
-    text_box.append(_label(title, "heading", wrap=True))
-    if subtitle:
-        text_box.append(_label(subtitle, "dim-label", wrap=True))
-    row.append(text_box)
+        row.add_prefix(image)
     if suffix is not None:
-        row.append(suffix)
-    button.set_child(row)
+        row.add_suffix(suffix)
     if callback:
-        button.connect("clicked", callback)
-    container.append(button)
+        row.set_activatable(True)
+        row.connect("activated", callback)
+    container.add(row)
+    return row
 
 
 def build_overview(window, incidents, boot_summary, source_status):
@@ -125,24 +126,21 @@ def build_overview(window, incidents, boot_summary, source_status):
         state_style = "dim-label"
         state_icon = "emblem-system-symbolic"
 
-    status = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-    status.add_css_class("card")
-    status.set_margin_top(2)
-    status.set_margin_bottom(2)
-    status.set_margin_start(2)
-    status.set_margin_end(2)
-    status.set_hexpand(True)
-    status.set_margin_top(4)
-    status.set_margin_bottom(4)
-    status.set_margin_start(4)
-    status.set_margin_end(4)
-    status.set_spacing(12)
+    status = Adw.PreferencesGroup()
+    status_content = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+    status_content.set_margin_top(12)
+    status_content.set_margin_bottom(12)
+    status_content.set_margin_start(16)
+    status_content.set_margin_end(16)
     status_icon = Gtk.Image.new_from_icon_name(state_icon)
     status_icon.set_pixel_size(24)
-    status.append(status_icon)
+    status_content.append(status_icon)
     status_label = _label(state_text, state_style, wrap=True)
     status_label.set_hexpand(True)
-    status.append(status_label)
+    status_content.append(status_label)
+    status_row = Adw.PreferencesRow()
+    status_row.set_child(status_content)
+    status.add(status_row)
     root.append(status)
 
     available_sources = sum(1 for item in source_status.values() if item.get("available"))
@@ -157,32 +155,31 @@ def build_overview(window, incidents, boot_summary, source_status):
 
     sections = _flow(2)
 
-    recent, recent_body = _card(
+    recent = _card(
         "Recent incidents",
         "Open a finding to inspect its assessment and supporting evidence.",
     )
     if window.data_loading:
-        recent_body.append(_label("Loading incident history…", "dim-label"))
+        recent.add(_content_row("Loading incident history…"))
     elif window.data_error:
-        recent_body.append(_label("Incident history is unavailable.", "dim-label"))
+        recent.add(_content_row("Incident history is unavailable."))
     elif incidents:
         for incident in incidents[:6]:
             severity = incident.get("severity", "Unknown")
             badge = _label(severity, window.severity_style(severity))
             _append_row(
-                recent_body, incident["title"], incident.get("subtitle"),
+                recent, incident["title"], incident.get("subtitle"),
                 badge,
-                callback=lambda _button, item=incident: window.show_incident(item),
+                callback=lambda _row, item=incident: window.show_incident(item),
                 icon=incident.get("icon", "dialog-warning-symbolic"),
             )
     else:
-        recent_body.append(_label(
-            "Nothing to review yet. Run a scan to inspect accessible boot journals and optional sources.",
-            "dim-label", wrap=True,
+        recent.add(_content_row(
+            "Nothing to review yet. Run a scan to inspect accessible boot journals and optional sources."
         ))
     sections.append(recent)
 
-    patterns, patterns_body = _card(
+    patterns = _card(
         "Recurring patterns",
         "Matching event signatures recorded across multiple boots.",
     )
@@ -193,17 +190,16 @@ def build_overview(window, incidents, boot_summary, source_status):
             subtitle = item.get("example", "")
             count = _label(str(item.get("event_count", 0)) + " events", "dim-label")
             _append_row(
-                patterns_body, title, subtitle, count,
-                callback=lambda _button, recurrence=item: window.show_recurrence(recurrence),
+                patterns, title, subtitle, count,
+                callback=lambda _row, recurrence=item: window.show_recurrence(recurrence),
             )
     else:
-        patterns_body.append(_label(
-            "No repeated signatures have been recorded across multiple boots.",
-            "dim-label", wrap=True,
+        patterns.add(_content_row(
+            "No repeated signatures have been recorded across multiple boots."
         ))
     sections.append(patterns)
 
-    resources, resources_body = _card(
+    resources = _card(
         "Resource snapshot",
         "Latest optional sample. Unavailable hardware metrics are not inferred.",
     )
@@ -217,20 +213,16 @@ def build_overview(window, incidents, boot_summary, source_status):
             ("GPU load", window.format_percent(sample["gpu_busy_percent"])),
         ]
         for name, value in values:
-            line = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-            line.append(_label(name, "dim-label"))
-            value_label = _label(value, "heading", xalign=1)
-            value_label.set_hexpand(True)
-            line.append(value_label)
-            resources_body.append(line)
+            suffix = _label(value, "heading", xalign=1)
+            suffix.set_hexpand(True)
+            _append_row(resources, name, suffix=suffix)
     else:
-        resources_body.append(_label(
-            "No resource samples yet. Enable background resource sampling in Preferences to collect optional metrics.",
-            "dim-label", wrap=True,
+        resources.add(_content_row(
+            "No resource samples yet. Enable background resource sampling in Preferences to collect optional metrics."
         ))
     sections.append(resources)
 
-    attention, attention_body = _card(
+    attention = _card(
         "Diagnostic sources",
         "Availability reflects the last recorded check, not a guarantee of system health.",
     )
@@ -241,13 +233,12 @@ def build_overview(window, incidents, boot_summary, source_status):
             state = "Stale" if available and stale else ("Available" if available else "Unavailable")
             style = "warning" if stale or not available else "success"
             _append_row(
-                attention_body, name.replace("-", " ").title(),
+                attention, name.replace("-", " ").title(),
                 source.get("detail", ""), _label(state, style),
             )
     else:
-        attention_body.append(_label(
-            "Source status will appear after diagnostic records have been collected.",
-            "dim-label", wrap=True,
+        attention.add(_content_row(
+            "Source status will appear after diagnostic records have been collected."
         ))
     sections.append(attention)
 

@@ -128,18 +128,10 @@ class FaultlineWindow(Adw.ApplicationWindow):
 
         self.nav_rows = {}
         for name, title, icon in self.nav_names:
-            row = Gtk.ListBoxRow()
-            box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-            box.set_margin_top(7)
-            box.set_margin_bottom(7)
-            box.set_margin_start(9)
-            box.set_margin_end(9)
+            row = Adw.ActionRow()
+            row.set_title(title)
             image = Gtk.Image.new_from_icon_name(icon)
-            image.set_pixel_size(16)
-            label = Gtk.Label(label=title, xalign=0, hexpand=True)
-            box.append(image)
-            box.append(label)
-            row.set_child(box)
+            row.add_prefix(image)
             row.set_name(name)
             nav_list.append(row)
             self.nav_rows[name] = row
@@ -470,12 +462,12 @@ class FaultlineWindow(Adw.ApplicationWindow):
             ("Sampling interval (seconds)", "sample_interval_seconds", 2, 300),
             ("Sample history (hours)", "sample_retention_hours", 1, 720),
         ]:
-            row = Adw.ActionRow()
+            row = Adw.SpinRow()
             row.set_title(title)
-            spin = Gtk.SpinButton.new_with_range(minimum, maximum, 1)
-            spin.set_value(settings[key])
-            spin.connect("value-changed", self.on_setting_number, key)
-            row.add_suffix(spin)
+            row.set_range(minimum, maximum)
+            row.set_digits(0)
+            row.set_value(settings[key])
+            row.connect("notify::value", self.on_setting_number, key)
             group.add(row)
 
         group = self.group(page, "Storage and retention",                           "Older boot records are pruned after a successful scan. Unknown timestamps are retained.")
@@ -492,12 +484,12 @@ class FaultlineWindow(Adw.ApplicationWindow):
             ("History retention (days)", "retention_days", 1, 3650),
             ("Maximum boots per scan", "max_boots_per_scan", 1, 100),
         ]:
-            row = Adw.ActionRow()
+            row = Adw.SpinRow()
             row.set_title(title)
-            spin = Gtk.SpinButton.new_with_range(minimum, maximum, 1)
-            spin.set_value(settings[key])
-            spin.connect("value-changed", self.on_setting_number, key)
-            row.add_suffix(spin)
+            row.set_range(minimum, maximum)
+            row.set_digits(0)
+            row.set_value(settings[key])
+            row.connect("notify::value", self.on_setting_number, key)
             group.add(row)
 
         group = self.group(page, "Notifications",
@@ -508,16 +500,15 @@ class FaultlineWindow(Adw.ApplicationWindow):
         notify_row.set_active(bool(settings["notify_new_incidents"]))
         notify_row.connect("notify::active", self.on_setting_switch, "notify_new_incidents")
         group.add(notify_row)
-        severity_row = Adw.ActionRow()
+        severity_row = Adw.ComboRow()
         severity_row.set_title("Minimum notification severity")
-        severity_dropdown = Gtk.DropDown.new_from_strings(["Low", "Medium", "High"])
-        severity_dropdown.set_selected(
+        severity_row.set_model(Gtk.StringList.new(["Low", "Medium", "High"]))
+        severity_row.set_selected(
             {"low": 0, "medium": 1, "high": 2}.get(
                 settings["notification_min_severity"], 0
             )
         )
-        severity_dropdown.connect("notify::selected", self.on_notification_severity_changed)
-        severity_row.add_suffix(severity_dropdown)
+        severity_row.connect("notify::selected", self.on_notification_severity_changed)
         group.add(severity_row)
 
         self.show_page("overview")
@@ -614,9 +605,9 @@ class FaultlineWindow(Adw.ApplicationWindow):
         update_setting(key, row.get_active())
         self.toast("Preference saved.")
 
-    def on_setting_number(self, spin, key):
+    def on_setting_number(self, row, _pspec, key):
         from faultline.settings import update_setting
-        update_setting(key, spin.get_value_as_int())
+        update_setting(key, int(row.get_value()))
 
     @staticmethod
     def severity_style(severity):
