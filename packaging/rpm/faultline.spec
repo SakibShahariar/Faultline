@@ -1,5 +1,5 @@
 Name:           faultline
-Version:        0.1.4
+Version:        0.1.5
 Release:        1%{?dist}
 Summary:        Local-first Linux crash diagnosis and system forensics
 License:        MIT
@@ -55,6 +55,10 @@ python3 -m compileall -q faultline tests demo/native
 %{_userunitdir}/faultline-sampler.service
 
 %changelog
+* Thu Nov 19 2026 Sakib Shahariar <74959773+SakibShahariar@users.noreply.github.com> - 0.1.5-1
+- Use libadwaita groups and rows for the dashboard, navigation, and settings
+- Fix clearing diagnostic history and the resource sampler retention test
+
 * Fri Nov 13 2026 Sakib Shahariar <74959773+SakibShahariar@users.noreply.github.com> - 0.1.4-1
 - Improve responsive window sizing and GNOME extension inventory presentation
 - Validate native GTK, Fedora RPM, and AppImage builds
