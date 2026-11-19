@@ -1,5 +1,6 @@
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 from pathlib import Path
 
@@ -53,7 +54,7 @@ class SamplerTests(unittest.TestCase):
             db = Database(Path(directory) / "faultline.db")
             sample = {
                 "boot_id": "c" * 32,
-                "captured_at": "2026-11-12T06:00:00+00:00",
+                "captured_at": (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat(),
                 "cpu_percent": 20.0,
                 "memory_used_bytes": 1024,
                 "memory_total_bytes": 2048,

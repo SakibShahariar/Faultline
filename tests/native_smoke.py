@@ -31,9 +31,37 @@ assert isinstance(clamp, module.Adw.Clamp), "Overview is not width-clamped"
 assert clamp.get_maximum_size() == 1200, "Overview width limit changed unexpectedly"
 assert clamp.get_tightening_threshold() == 840, "Overview clamp threshold changed unexpectedly"
 assert overview.get_policy()[0] == module.Gtk.PolicyType.NEVER, "Overview should not introduce horizontal scrolling"
+
+
+def walk(widget):
+    """Yield a widget and all of its GTK4 children."""
+    yield widget
+    children = widget.observe_children()
+    for index in range(children.get_n_items()):
+        child = children.get_item(index)
+        if isinstance(child, module.Gtk.Widget):
+            yield from walk(child)
+
+
+assert any(isinstance(item, module.Adw.PreferencesGroup) for item in walk(overview)), (
+    "Overview cards should use Adwaita preference groups"
+)
+assert not any(isinstance(item, module.Gtk.Frame) for item in walk(overview)), (
+    "Overview should not use bare Gtk.Frame cards"
+)
+preferences = window.pages["preferences"]
+assert sum(isinstance(item, module.Adw.SpinRow) for item in walk(preferences)) == 4, (
+    "Numeric settings should use Adw.SpinRow"
+)
+assert any(isinstance(item, module.Adw.ComboRow) for item in walk(preferences)), (
+    "Severity setting should use Adw.ComboRow"
+)
 icon_theme = module.Gtk.IconTheme.get_for_display(window.get_display())
 for _name, _label, icon_name in window.nav_names:
     assert icon_theme.has_icon(icon_name), f"Missing bundled navigation icon: {icon_name}"
+assert all(isinstance(row, module.Adw.ActionRow) for row in window.nav_rows.values()), (
+    "Navigation entries should be Adw.ActionRow instances"
+)
 assert window.get_visible(), "Faultline main window is not visible"
 assert window.scan_label.get_text() == "Scan"
 assert not window.scan_spinner.get_visible()
