@@ -188,6 +188,29 @@ user's `~/.config/gtk-4.0/gtk.css` as the single most expensive path and window
 construction taking about 0.6–0.7 s. That is a directional local sample, not a
 CI-grade measurement; review a fresh CI artifact before changing the bundle.
 
+## CI profile review (2026-11-19)
+
+The revised profiler ran on CI with a working FUSE mount, three trials per mode,
+and no extraction fallback. Median values from
+`profile-summary.json` in the AppImage diagnostics artifact:
+
+| Mode | Wall time | GTK import | Window mapped | Traced |
+| --- | ---: | ---: | ---: | --- |
+| Normal AppImage runtime | 4.43 s | 2.18 s | 3.64 s | no |
+| AppRun on mounted FUSE AppDir | 0.95 s | 0.33 s | 0.70 s | yes |
+| AppRun from extracted AppDir | 0.55 s | 0.18 s | 0.46 s | yes |
+
+The normal runtime is about 3.5 s slower than the same AppRun launched from an
+already-mounted AppDir, while the traced mounted run spends most of its
+syscall time in `openat`/`newfstatat` (roughly 0.09 s per trial) probing paths
+under the mount, especially bundled Python `__pycache__` and Faultline data
+directories. This points to AppImage runtime setup and filesystem probing on
+the mounted SquashFS as the dominant costs, not GTK, libadwaita, or relocation
+work inside the application. No application-side change can remove that cost
+while keeping the single-file portable bundle, so the build and compression
+settings are left unchanged; any future packaging experiment must still pass
+the clean offline, X11, and Wayland smoke tests.
+
 ## Graphics driver boundary
 
 The AppDir recipe bundles GTK4/libadwaita/PyGObject and the X11/Wayland client protocol libraries, but leaves GL/EGL/GBM/DRM and Mesa driver components to the host. appimage-builder excludes hardware-specific graphics packages by default; explicitly bundling them can freeze a Mesa stack that conflicts with proprietary or host-updated drivers. The clean smoke-test container therefore supplies host-side GL/EGL/GBM/DRM libraries. A normal desktop Linux host is expected to provide a functioning graphics stack. The recipe also no longer copies a README file that its own documentation exclusion would remove.
