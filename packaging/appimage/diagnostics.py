@@ -352,12 +352,16 @@ def profile(args):
         except Exception as exc:
             mount_error = str(exc)
 
-        modes = [("appimage_runtime", image, False)]
+        # strace -f also traces the setuid fusermount helper, which loses its
+        # mount privilege under ptrace. The normal AppImage mode is therefore
+        # measured without strace; syscall attribution uses the mounted AppRun
+        # launched outside the traced process tree.
+        modes = [("appimage_runtime", image, False, False)]
         if mounted is not None:
-            modes.append(("mounted_appdir_launcher", mounted / "AppRun", True))
+            modes.append(("mounted_appdir_launcher", mounted / "AppRun", True, True))
         else:
-            modes.append(("mounted_appdir_launcher_unavailable", None, True))
-        modes.append(("extracted_appdir_launcher", extracted / "AppRun", True))
+            modes.append(("mounted_appdir_launcher_unavailable", None, True, False))
+        modes.append(("extracted_appdir_launcher", extracted / "AppRun", True, True))
 
         report = {
             "appimage": str(image),
@@ -366,16 +370,18 @@ def profile(args):
             "mount_error": mount_error,
             "modes": {},
             "notes": [
-                "Each mode is warmed up once, then traced for --runs trials.",
-                "The normal AppImage mode is never silently replaced by extraction; "
-                "a fallback is labeled explicitly in the trial record.",
+                "Each mode is warmed up once and measured for --runs trials.",
+                "The normal AppImage mode is untraced: strace -f breaks the setuid "
+                "FUSE mount helper. The mounted AppRun mode is traced instead.",
+                "A normal-mode extraction fallback is labeled explicitly and is "
+                "never reported as a mounted-filesystem result.",
                 "wait4 wall time includes the launcher waiting on its child; it is "
                 "not file-loading cost.",
             ],
         }
 
         try:
-            for mode_name, executable, direct in modes:
+            for mode_name, executable, direct, traced in modes:
                 if executable is None:
                     report["modes"][mode_name] = {
                         "skipped": True,
@@ -406,15 +412,18 @@ def profile(args):
                     trial_output = mode_output / f"trial-{index + 1}"
                     trial_output.mkdir(parents=True, exist_ok=True)
                     raw_log = trial_output / "strace.log"
-                    traced_command = base_command[:4] + [
-                        strace, "-f", "-yy", "-ttt", "-T",
-                        "-e", "trace=%file,%process,%memory",
-                        "-o", str(raw_log), "--",
-                        "env", "LD_DEBUG=libs,statistics",
-                    ] + base_command[4:]
+                    command = base_command
+                    if traced:
+                        command = base_command[:4] + [
+                            strace, "-f", "-yy", "-ttt", "-T",
+                            "-e", "trace=%file,%process,%memory",
+                            "-o", str(raw_log), "--",
+                            "env", "LD_DEBUG=libs,statistics",
+                        ] + base_command[4:]
                     trial_env = base_env.copy()
+                    started = time.perf_counter()
                     result = subprocess.run(
-                        traced_command,
+                        command,
                         env=trial_env,
                         text=True,
                         stdout=subprocess.PIPE,
@@ -422,12 +431,13 @@ def profile(args):
                         timeout=180,
                         check=False,
                     )
+                    wall_seconds = time.perf_counter() - started
                     fallback_used = False
                     if result.returncode != 0 and not direct:
                         fallback_used = True
                         trial_env["APPIMAGE_EXTRACT_AND_RUN"] = "1"
                         result = subprocess.run(
-                            traced_command,
+                            command,
                             env=trial_env,
                             text=True,
                             stdout=subprocess.PIPE,
@@ -435,6 +445,7 @@ def profile(args):
                             timeout=180,
                             check=False,
                         )
+                        wall_seconds = time.perf_counter() - started
 
                     combined = result.stderr + "\n" + result.stdout
                     (trial_output / "loader-output.log").write_text(
@@ -450,6 +461,7 @@ def profile(args):
                     (trial_output / "profile-exit-status.txt").write_text(
                         f"returncode={result.returncode}\n"
                         f"fallback_used={fallback_used}\n"
+                        f"traced={traced}\n"
                         f"gtk_imported={trace.get('GTK imported', 'missing')}\n"
                         f"main_window_mapped={trace.get('main window mapped', 'missing')}\n",
                         encoding="utf-8",
@@ -462,13 +474,16 @@ def profile(args):
                         )
 
                     syscall_summary = (
-                        summarize_strace_log(raw_log) if raw_log.is_file()
+                        summarize_strace_log(raw_log)
+                        if traced and raw_log.is_file()
                         else {"syscalls": [], "paths": []}
                     )
                     trials.append({
                         "trial": index + 1,
                         "returncode": result.returncode,
                         "fallback_used": fallback_used,
+                        "traced": traced,
+                        "wall_seconds": round(wall_seconds, 3),
                         "gtk_import_seconds": trace["GTK imported"],
                         "window_mapped_seconds": trace["main window mapped"],
                         "strace_summary": syscall_summary,
@@ -477,6 +492,7 @@ def profile(args):
                 report["modes"][mode_name] = {
                     "executable": str(executable),
                     "direct": direct,
+                    "traced": traced,
                     "fallback_used": any(trial["fallback_used"] for trial in trials),
                     "trials": trials,
                     "aggregate": aggregate_trials(trials),
@@ -493,11 +509,15 @@ def profile(args):
             print(f"=== {mode_name}: skipped ({mode['reason']}) ===")
             continue
         first = mode["trials"][0]
-        print_syscall_summary(mode_name, mode["aggregate"])
+        if mode["traced"]:
+            print_syscall_summary(mode_name, mode["aggregate"])
+        else:
+            print(f"=== {mode_name}: untraced wall-time measurements ===")
         print(
-            f"{mode_name}: GTK import {first['gtk_import_seconds']:.3f}s; "
+            f"{mode_name}: wall {first['wall_seconds']:.3f}s; "
+            f"GTK import {first['gtk_import_seconds']:.3f}s; "
             f"main window mapped {first['window_mapped_seconds']:.3f}s; "
-            f"fallback={mode['fallback_used']}"
+            f"traced={mode['traced']}; fallback={mode['fallback_used']}"
         )
     print(f"Wrote startup profiles to {output}")
 

@@ -171,10 +171,13 @@ python3 packaging/appimage/diagnostics.py inventory \
 The benchmark requires `dbus-run-session` and `xvfb-run`. The profile command
 also requires `strace`. It profiles the normal AppImage runtime, a persistent
 FUSE mount, and an extracted AppDir separately, with one warm-up and `--runs`
-traced trials per available mode. Each trial keeps its raw `strace` log and a
-per-syscall/per-path aggregation; `profile-summary.json` records whether the
-mount was available and whether any run fell back to extraction. A fallback is
-labeled explicitly and is never reported as a normal mounted-runtime result.
+trials per available mode. The normal AppImage mode is measured without
+`strace` because tracing the setuid FUSE helper breaks mounting; the mounted
+and extracted AppDir modes are traced, with a raw `strace` log and a
+per-syscall/per-path aggregation per trial. `profile-summary.json` records
+whether the mount was available, which modes were traced, and whether any run
+fell back to extraction. A fallback is labeled explicitly and is never
+reported as a normal mounted-runtime result.
 
 ## Graphics driver boundary
 
