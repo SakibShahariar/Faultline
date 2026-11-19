@@ -19,6 +19,8 @@ jobs:
   appimage:
     name: Build and smoke-test AppImage
     runs-on: ubuntu-24.04
+    # appimage-builder can hang indefinitely on a stalled package mirror.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
