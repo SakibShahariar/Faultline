@@ -249,111 +249,255 @@ def benchmark(args):
     }, indent=2))
 
 
+SYSCALL_RE = re.compile(r"^\s*\d+\s+[\d:.]+\s+([A-Za-z_]\w*)\(")
+SYSCALL_DURATION_RE = re.compile(r"<([0-9]+\.[0-9]+)>\s*$")
+QUOTED_PATH_RE = re.compile(r'"([^"\n]+)"')
+DESCRIPTOR_PATH_RE = re.compile(r"\d+<(/[^>\s]*)")
+
+
+def summarize_strace_log(log_path: Path) -> dict:
+    """Aggregate a raw strace log by syscall and by file path."""
+    calls: dict[str, int] = {}
+    seconds: dict[str, float] = {}
+    path_seconds: dict[str, float] = {}
+    with log_path.open(encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            duration_match = SYSCALL_DURATION_RE.search(line.rstrip())
+            syscall_match = SYSCALL_RE.match(line)
+            if duration_match is None or syscall_match is None:
+                continue
+            name = syscall_match.group(1)
+            duration = float(duration_match.group(1))
+            calls[name] = calls.get(name, 0) + 1
+            seconds[name] = seconds.get(name, 0.0) + duration
+            candidates = QUOTED_PATH_RE.findall(line) + DESCRIPTOR_PATH_RE.findall(line)
+            path = next((item for item in candidates if item.startswith("/")), None)
+            if path is not None:
+                path_seconds[path] = path_seconds.get(path, 0.0) + duration
+    return {
+        "syscalls": [
+            {
+                "name": name,
+                "calls": calls[name],
+                "seconds": round(seconds[name], 6),
+            }
+            for name in sorted(calls, key=lambda item: -seconds[item])
+        ],
+        "paths": [
+            {"path": path, "seconds": round(value, 6)}
+            for path, value in sorted(
+                path_seconds.items(), key=lambda item: -item[1]
+            )[:20]
+        ],
+    }
+
+
+def aggregate_trials(trials: list[dict]) -> dict:
+    calls: dict[str, int] = {}
+    seconds: dict[str, float] = {}
+    paths: dict[str, float] = {}
+    for trial in trials:
+        for syscall in trial["strace_summary"]["syscalls"]:
+            name = syscall["name"]
+            calls[name] = calls.get(name, 0) + syscall["calls"]
+            seconds[name] = seconds.get(name, 0.0) + syscall["seconds"]
+        for path in trial["strace_summary"]["paths"]:
+            paths[path["path"]] = paths.get(path["path"], 0.0) + path["seconds"]
+    return {
+        "syscalls": [
+            {
+                "name": name,
+                "calls": calls[name],
+                "seconds": round(seconds[name], 6),
+            }
+            for name in sorted(calls, key=lambda item: -seconds[item])[:15]
+        ],
+        "paths": [
+            {"path": path, "seconds": round(value, 6)}
+            for path, value in sorted(paths.items(), key=lambda item: -item[1])[:15]
+        ],
+    }
+
+
+def print_syscall_summary(title: str, summary: dict):
+    print(f"=== {title}: dominant syscalls ===")
+    for syscall in summary["syscalls"]:
+        print(
+            f"  {syscall['name']:<16} {syscall['calls']:>7} calls  "
+            f"{syscall['seconds']:.4f}s"
+        )
+    print(f"=== {title}: top paths by attributed syscall time ===")
+    for path in summary["paths"]:
+        print(f"  {path['seconds']:.4f}s  {path['path']}")
+
+
 def profile(args):
     image = args.appimage.resolve()
+    if not image.is_file():
+        raise SystemExit(f"AppImage not found: {image}")
     output = Path(args.output)
     output.mkdir(parents=True, exist_ok=True)
     strace = shutil.which("strace")
     if not strace:
         raise SystemExit("strace is required for the optional AppImage profile")
-
-    env = os.environ.copy()
-    env.update({
-        "GTK_A11Y": "none",
-        "GDK_BACKEND": "x11",
-        "FAULTLINE_STARTUP_TRACE": "1",
-    })
+    runs = max(1, args.runs)
 
     with tempfile.TemporaryDirectory(prefix="faultline-appimage-profile-") as temporary:
         extracted = extract_appimage(image, Path(temporary) / "extract")
-        targets = [
-            ("appimage_runtime", image, False),
-            ("extracted_appdir_launcher", extracted / "AppRun", True),
-        ]
-        summaries = {}
+        mount_process = None
+        mounted = None
+        mount_error = None
+        try:
+            mount_process, mounted = mount_appimage(image)
+        except Exception as exc:
+            mount_error = str(exc)
 
-        for mode_name, executable, direct in targets:
-            mode_output = output / mode_name
-            mode_output.mkdir(parents=True, exist_ok=True)
-            summary_path = mode_output / "strace-summary.txt"
+        modes = [("appimage_runtime", image, False)]
+        if mounted is not None:
+            modes.append(("mounted_appdir_launcher", mounted / "AppRun", True))
+        else:
+            modes.append(("mounted_appdir_launcher_unavailable", None, True))
+        modes.append(("extracted_appdir_launcher", extracted / "AppRun", True))
 
-            def traced_command(extra_env=()):
-                return [
-                    "dbus-run-session", "--", "xvfb-run", "-a",
-                    strace, "-f", "-c", "-w",
-                    "-e", "trace=%file,%process",
-                    "-o", str(summary_path), "--",
-                    "env", "LD_DEBUG=statistics", *extra_env,
-                    str(executable), "--smoke-test",
-                ]
+        report = {
+            "appimage": str(image),
+            "runs_per_mode": runs,
+            "mount_available": mounted is not None,
+            "mount_error": mount_error,
+            "modes": {},
+            "notes": [
+                "Each mode is warmed up once, then traced for --runs trials.",
+                "The normal AppImage mode is never silently replaced by extraction; "
+                "a fallback is labeled explicitly in the trial record.",
+                "wait4 wall time includes the launcher waiting on its child; it is "
+                "not file-loading cost.",
+            ],
+        }
 
-            result = subprocess.run(
-                traced_command(),
-                env=env,
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                timeout=120,
-                check=False,
-            )
-            fallback_used = False
-            if result.returncode != 0 and not direct:
-                fallback_used = True
-                result = subprocess.run(
-                    traced_command(("APPIMAGE_EXTRACT_AND_RUN=1",)),
-                    env=env,
+        try:
+            for mode_name, executable, direct in modes:
+                if executable is None:
+                    report["modes"][mode_name] = {
+                        "skipped": True,
+                        "reason": mount_error or "FUSE mount unavailable",
+                    }
+                    continue
+                mode_output = output / mode_name
+                mode_output.mkdir(parents=True, exist_ok=True)
+                base_command, base_env = launch_command(
+                    executable, appimage=image, direct_apprun=direct
+                )
+                warmup = subprocess.run(
+                    base_command,
+                    env=base_env,
                     text=True,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     timeout=120,
                     check=False,
                 )
+                if warmup.returncode != 0:
+                    raise SystemExit(
+                        f"{mode_name} warm-up failed: {(warmup.stderr + warmup.stdout)[-4000:]}"
+                    )
 
-            combined = result.stderr + "\n" + result.stdout
-            (mode_output / "loader-statistics.log").write_text(
-                combined, encoding="utf-8"
-            )
-            trace = {
-                name: float(value)
-                for name, value in TRACE_RE.findall(combined)
-            }
-            required = ("GTK imported", "main window mapped")
-            missing = [name for name in required if name not in trace]
-            (mode_output / "profile-exit-status.txt").write_text(
-                f"returncode={result.returncode}\n"
-                f"fallback_used={fallback_used}\n"
-                f"gtk_imported={trace.get('GTK imported', 'missing')}\n"
-                f"main_window_mapped={trace.get('main window mapped', 'missing')}\n",
-                encoding="utf-8",
-            )
-            if result.returncode != 0 or missing:
-                raise SystemExit(
-                    f"{mode_name} profile failed: returncode={result.returncode}; "
-                    f"missing milestones={missing}; output={combined[-6000:]}"
-                )
+                trials = []
+                for index in range(runs):
+                    trial_output = mode_output / f"trial-{index + 1}"
+                    trial_output.mkdir(parents=True, exist_ok=True)
+                    raw_log = trial_output / "strace.log"
+                    traced_command = base_command[:4] + [
+                        strace, "-f", "-yy", "-ttt", "-T",
+                        "-e", "trace=%file,%process,%memory",
+                        "-o", str(raw_log), "--",
+                        "env", "LD_DEBUG=libs,statistics",
+                    ] + base_command[4:]
+                    trial_env = base_env.copy()
+                    result = subprocess.run(
+                        traced_command,
+                        env=trial_env,
+                        text=True,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        timeout=180,
+                        check=False,
+                    )
+                    fallback_used = False
+                    if result.returncode != 0 and not direct:
+                        fallback_used = True
+                        trial_env["APPIMAGE_EXTRACT_AND_RUN"] = "1"
+                        result = subprocess.run(
+                            traced_command,
+                            env=trial_env,
+                            text=True,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            timeout=180,
+                            check=False,
+                        )
 
-            syscall_summary = (
-                summary_path.read_text(encoding="utf-8", errors="replace")
-                if summary_path.exists() else "strace did not produce a summary\n"
-            )
-            loader_lines = combined.splitlines()
-            summaries[mode_name] = {
-                "fallback_used": fallback_used,
-                "gtk_import_seconds": trace["GTK imported"],
-                "window_mapped_seconds": trace["main window mapped"],
-                "strace_summary": syscall_summary,
-                "loader_statistics": loader_lines[-100:],
-            }
+                    combined = result.stderr + "\n" + result.stdout
+                    (trial_output / "loader-output.log").write_text(
+                        combined, encoding="utf-8"
+                    )
+                    trace = {
+                        name: float(value) for name, value in TRACE_RE.findall(combined)
+                    }
+                    missing = [
+                        name for name in ("GTK imported", "main window mapped")
+                        if name not in trace
+                    ]
+                    (trial_output / "profile-exit-status.txt").write_text(
+                        f"returncode={result.returncode}\n"
+                        f"fallback_used={fallback_used}\n"
+                        f"gtk_imported={trace.get('GTK imported', 'missing')}\n"
+                        f"main_window_mapped={trace.get('main window mapped', 'missing')}\n",
+                        encoding="utf-8",
+                    )
+                    if result.returncode != 0 or missing:
+                        raise SystemExit(
+                            f"{mode_name} trial {index + 1} failed: "
+                            f"returncode={result.returncode}; missing milestones={missing}; "
+                            f"output={combined[-6000:]}"
+                        )
 
-    for mode_name, summary in summaries.items():
-        print(f"=== {mode_name}: file/process syscall summary ===")
-        print(summary["strace_summary"])
-        print(f"=== {mode_name}: dynamic-loader statistics and startup trace ===")
-        print("\n".join(summary["loader_statistics"]))
+                    syscall_summary = (
+                        summarize_strace_log(raw_log) if raw_log.is_file()
+                        else {"syscalls": [], "paths": []}
+                    )
+                    trials.append({
+                        "trial": index + 1,
+                        "returncode": result.returncode,
+                        "fallback_used": fallback_used,
+                        "gtk_import_seconds": trace["GTK imported"],
+                        "window_mapped_seconds": trace["main window mapped"],
+                        "strace_summary": syscall_summary,
+                    })
+
+                report["modes"][mode_name] = {
+                    "executable": str(executable),
+                    "direct": direct,
+                    "fallback_used": any(trial["fallback_used"] for trial in trials),
+                    "trials": trials,
+                    "aggregate": aggregate_trials(trials),
+                }
+        finally:
+            if mount_process is not None:
+                stop_mount(mount_process)
+
+    (output / "profile-summary.json").write_text(
+        json.dumps(report, indent=2) + "\n", encoding="utf-8"
+    )
+    for mode_name, mode in report["modes"].items():
+        if mode.get("skipped"):
+            print(f"=== {mode_name}: skipped ({mode['reason']}) ===")
+            continue
+        first = mode["trials"][0]
+        print_syscall_summary(mode_name, mode["aggregate"])
         print(
-            f"{mode_name}: GTK import {summary['gtk_import_seconds']:.3f}s; "
-            f"main window mapped {summary['window_mapped_seconds']:.3f}s; "
-            f"fallback={summary['fallback_used']}"
+            f"{mode_name}: GTK import {first['gtk_import_seconds']:.3f}s; "
+            f"main window mapped {first['window_mapped_seconds']:.3f}s; "
+            f"fallback={mode['fallback_used']}"
         )
     print(f"Wrote startup profiles to {output}")
 
@@ -427,6 +571,7 @@ def main():
     prof = subparsers.add_parser("profile")
     prof.add_argument("--appimage", required=True, type=Path)
     prof.add_argument("--output", required=True)
+    prof.add_argument("--runs", type=int, default=3)
     prof.set_defaults(function=profile)
 
     inv = subparsers.add_parser("inventory")
