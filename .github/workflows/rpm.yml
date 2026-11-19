@@ -81,11 +81,3 @@ jobs:
           path: dist/
           if-no-files-found: error
 
-      - name: Attach RPM to tagged GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/*.rpm
-            dist/SHA256SUMS
-          fail_on_unmatched_files: true

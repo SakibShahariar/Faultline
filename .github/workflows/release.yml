@@ -1,0 +1,152 @@
+name: Publish release assets
+
+# A single coordinated publisher attaches exactly the three public assets after
+# the AppImage and Fedora RPM workflows have succeeded for the same tag commit.
+on:
+  workflow_run:
+    workflows: ["AppImage", "Fedora RPM"]
+    types: [completed]
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: faultline-publish-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve tag and version
+        id: version
+        run: |
+          sha="${{ github.event.workflow_run.head_sha }}"
+          tag="$(git tag --points-at "$sha" | head -n 1)"
+          if [[ "$tag" != v* ]]; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          version="${tag#v}"
+          project_version="$(sed -n 's/^version = "\(.*\)"$/\1/p' pyproject.toml | head -n1)"
+          if [[ "$version" != "$project_version" ]]; then
+            echo "Tag $tag does not match pyproject.toml version $project_version" >&2
+            exit 1
+          fi
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for both build workflows
+        if: steps.version.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          for attempt in $(seq 1 60); do
+            ready=1
+            for workflow in appimage.yml rpm.yml; do
+              count="$(gh run list --workflow "$workflow" --commit "$SHA" \
+                --status success --json databaseId --jq 'length')"
+              [[ "$count" -gt 0 ]] || ready=0
+            done
+            [[ "$ready" -eq 1 ]] && break
+            sleep 10
+          done
+          [[ "$ready" -eq 1 ]] || {
+            echo "Both AppImage and Fedora RPM workflows must succeed for $SHA" >&2
+            exit 1
+          }
+
+      - name: Download build artifacts
+        if: steps.version.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          fetch_artifact() {
+            local workflow="$1" name="$2" destination="$3"
+            local run_id artifact_id
+            run_id="$(gh run list --workflow "$workflow" --commit "$SHA" \
+              --status success --json databaseId --jq '.[0].databaseId')"
+            test -n "$run_id"
+            artifact_id="$(gh api "repos/$GH_REPO/actions/runs/$run_id/artifacts" \
+              --jq ".artifacts[] | select(.name == \"$name\") | .id" | head -n1)"
+            test -n "$artifact_id"
+            mkdir -p "$destination"
+            gh api "repos/$GH_REPO/actions/artifacts/$artifact_id/zip" \
+              > "$destination/artifact.zip"
+            unzip -q "$destination/artifact.zip" -d "$destination"
+          }
+          fetch_artifact appimage.yml "Faultline-$VERSION-x86_64-AppImage" artifacts/appimage
+          fetch_artifact rpm.yml "Faultline-$VERSION-Fedora-RPM" artifacts/rpm
+
+      - name: Stage and verify the three public assets
+        id: stage
+        if: steps.version.outputs.publish == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir -p release
+          image="Faultline-$VERSION-x86_64.AppImage"
+          cp "artifacts/appimage/$image" "release/$image"
+          rpm="$(find artifacts/rpm -maxdepth 1 \
+            -name "faultline-$VERSION-*.fc*.noarch.rpm" ! -name '*.src.rpm' -print -quit)"
+          test -n "$rpm"
+          rpm_name="$(basename "$rpm")"
+          cp "$rpm" "release/$rpm_name"
+          (cd release && sha256sum "$image" "$rpm_name" > SHA256SUMS)
+          python3 packaging/release/verify_assets.py \
+            --appimage "release/$image" \
+            --rpm "release/$rpm_name" \
+            --manifest release/SHA256SUMS \
+            --version "$VERSION"
+          echo "rpm_name=$rpm_name" >> "$GITHUB_OUTPUT"
+
+      - name: Publish and verify the GitHub Release
+        if: steps.version.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+          IMAGE: Faultline-${{ steps.version.outputs.version }}-x86_64.AppImage
+          RPM_NAME: ${{ steps.stage.outputs.rpm_name }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "release/$IMAGE" "release/$RPM_NAME" \
+              release/SHA256SUMS --clobber
+          else
+            gh release create "$TAG" "release/$IMAGE" "release/$RPM_NAME" \
+              release/SHA256SUMS --verify-tag --title "Faultline $VERSION" \
+              --notes "Faultline $VERSION provides a portable x86_64 AppImage and a Fedora noarch RPM. See docs/packaging-appimage.md and docs/packaging-fedora.md for installation details."
+          fi
+          gh api "repos/$GH_REPO/releases/tags/$TAG" --jq '.assets[] | [.name, .id] | @tsv' |
+            while IFS=$'\t' read -r name id; do
+              case "$name" in
+                "$IMAGE"|"$RPM_NAME"|SHA256SUMS) ;;
+                *) gh api -X DELETE "repos/$GH_REPO/releases/assets/$id" >/dev/null ;;
+              esac
+            done
+          assets="$(gh api "repos/$GH_REPO/releases/tags/$TAG" --jq '.assets[].name' | sort)"
+          expected="$(printf '%s\n' "$IMAGE" "$RPM_NAME" SHA256SUMS | sort)"
+          [[ "$assets" == "$expected" ]] || {
+            echo "Unexpected release assets:" >&2
+            echo "$assets" >&2
+            exit 1
+          }
+          python3 packaging/release/verify_assets.py \
+            --appimage "release/$IMAGE" \
+            --rpm "release/$RPM_NAME" \
+            --manifest release/SHA256SUMS \
+            --version "$VERSION"
+          echo "Verified exactly three release assets for $TAG"

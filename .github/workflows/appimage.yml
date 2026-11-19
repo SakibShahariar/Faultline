@@ -158,17 +158,3 @@ jobs:
             Faultline-${{ env.APP_VERSION }}-x86_64.AppImage.sha256
           if-no-files-found: error
 
-      - name: Attach AppImage to tagged GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            Faultline-${{ env.APP_VERSION }}-x86_64.AppImage
-            Faultline-${{ env.APP_VERSION }}-x86_64.AppImage.sha256
-          body: |
-            Faultline ${{ env.APP_VERSION }} x86_64 AppImage.
-
-            The image bundles Python, PyGObject, GTK 4, and libadwaita. It targets
-            Linux x86_64 with glibc 2.39 or newer. Host systemd diagnostic tools,
-            GNOME session utilities, graphics drivers, and display server remain
-            host-provided. See docs/packaging-appimage.md for runtime details.

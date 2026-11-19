@@ -151,10 +151,3 @@ jobs:
             dist/Faultline-${{ env.APP_VERSION }}-1.fc45.noarch.rpm
             dist/Faultline-${{ env.APP_VERSION }}-1.fc45.noarch.rpm.sha256
           if-no-files-found: error
-      - name: Attach RPM to tagged GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/Faultline-${{ env.APP_VERSION }}-1.fc45.noarch.rpm
-            dist/Faultline-${{ env.APP_VERSION }}-1.fc45.noarch.rpm.sha256
