@@ -93,6 +93,19 @@ jobs:
               export XDG_CONFIG_HOME=/tmp/state/config
               /tmp/Faultline.AppImage --cli boots
               test -s /tmp/state/data/faultline/crashes.db
+              case "$XDG_DATA_HOME" in /tmp/.mount_*|/tmp/Faultline*) exit 1 ;; esac
+              case "$XDG_CONFIG_HOME" in /tmp/.mount_*|/tmp/Faultline*) exit 1 ;; esac
+              cp /tmp/Faultline.AppImage /tmp/Faultline-first.AppImage
+              /tmp/Faultline-first.AppImage --cli boots
+              mkdir -p /tmp/state/config/faultline
+              printf '{"collect_coredumps": false}\n' \
+                > /tmp/state/config/faultline/settings.json
+              rm /tmp/Faultline-first.AppImage
+              cp /tmp/Faultline.AppImage /tmp/Faultline-second.AppImage
+              /tmp/Faultline-second.AppImage --cli boots
+              test -s /tmp/state/data/faultline/crashes.db
+              grep -q "\"collect_coredumps\": false" /tmp/state/config/faultline/settings.json
+              rm /tmp/Faultline-second.AppImage
               dbus-run-session -- xvfb-run -a \
                 env GTK_A11Y=none GDK_BACKEND=x11 /tmp/Faultline.AppImage --smoke-test
               mkdir -p /tmp/state/runtime
