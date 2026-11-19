@@ -57,7 +57,9 @@ python3 -m compileall -q faultline tests demo/native
 %changelog
 * Thu Nov 19 2026 Sakib Shahariar <74959773+SakibShahariar@users.noreply.github.com> - 0.1.5-1
 - Use libadwaita groups and rows for the dashboard, navigation, and settings
+- Add incident search, visible scan progress, and keyboard shortcuts
 - Fix clearing diagnostic history and the resource sampler retention test
+- Verify portable data paths, startup profiles, and release assets
 
 * Fri Nov 13 2026 Sakib Shahariar <74959773+SakibShahariar@users.noreply.github.com> - 0.1.4-1
 - Improve responsive window sizing and GNOME extension inventory presentation
