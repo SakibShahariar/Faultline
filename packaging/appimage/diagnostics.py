@@ -331,6 +331,17 @@ def print_syscall_summary(title: str, summary: dict):
         print(f"  {path['seconds']:.4f}s  {path['path']}")
 
 
+def profile_modes(image, mounted, extracted):
+    """Return (name, target, direct, traced) launch modes for profiling."""
+    modes = [("appimage_runtime", image, False, False)]
+    if mounted is not None:
+        modes.append(("mounted_appdir_launcher", mounted, True, True))
+    else:
+        modes.append(("mounted_appdir_launcher_unavailable", None, True, False))
+    modes.append(("extracted_appdir_launcher", extracted, True, True))
+    return modes
+
+
 def profile(args):
     image = args.appimage.resolve()
     if not image.is_file():
@@ -356,12 +367,7 @@ def profile(args):
         # mount privilege under ptrace. The normal AppImage mode is therefore
         # measured without strace; syscall attribution uses the mounted AppRun
         # launched outside the traced process tree.
-        modes = [("appimage_runtime", image, False, False)]
-        if mounted is not None:
-            modes.append(("mounted_appdir_launcher", mounted / "AppRun", True, True))
-        else:
-            modes.append(("mounted_appdir_launcher_unavailable", None, True, False))
-        modes.append(("extracted_appdir_launcher", extracted / "AppRun", True, True))
+        modes = profile_modes(image, mounted, extracted)
 
         report = {
             "appimage": str(image),

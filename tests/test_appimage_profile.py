@@ -38,6 +38,24 @@ class AppImageProfileTests(unittest.TestCase):
         self.assertEqual(by_path["/usr/lib/libgtk-4.so.1"], 0.00015)
         self.assertEqual(by_path["/usr/share/foo"], 0.00002)
 
+    def test_profile_modes_use_appdir_roots(self):
+        image = Path("/tmp/Faultline-0.1.5-x86_64.AppImage")
+        mounted = Path("/tmp/mounted-appdir")
+        extracted = Path("/tmp/extracted-appdir")
+        modes = diagnostics.profile_modes(image, mounted, extracted)
+        by_name = {name: target for name, target, _direct, _traced in modes}
+        self.assertEqual(by_name["mounted_appdir_launcher"], mounted)
+        self.assertEqual(by_name["extracted_appdir_launcher"], extracted)
+        for name, target, direct, _traced in modes:
+            if direct:
+                command, _env = diagnostics.launch_command(
+                    target, appimage=image, direct_apprun=True
+                )
+                self.assertEqual(
+                    command[4], str(target / "AppRun"),
+                    f"{name} must launch its AppDir's AppRun exactly once",
+                )
+
     def test_aggregate_trials_sums_counts_and_paths(self):
         trial = {
             "strace_summary": {
